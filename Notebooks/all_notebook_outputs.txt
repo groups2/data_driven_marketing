@@ -1,0 +1,964 @@
+====================================================================================================
+CELL 2
+====================================================================================================
+
+[CODE]
+
+import pandas as pd
+import numpy as np
+
+# Load lại data từ file pickle
+df_work = pd.read_pickle(r"D:\data_driven_marketing\df_full.pkl")
+
+# Kiểm tra nhanh
+print(df_work.shape)
+df_work.head()
+# 0. Copy data
+# ============================================================
+
+print("=" * 80)
+print("0. BASIC DATA INFO")
+print("=" * 80)
+
+print("Shape:", df_work.shape)
+print("Number of columns:", df_work.shape[1])
+print("Columns:")
+print(df_work.columns.tolist())
+
+[OUTPUT]
+
+(1608337, 59)
+================================================================================
+0. BASIC DATA INFO
+================================================================================
+Shape: (1608337, 59)
+Number of columns: 59
+Columns:
+['channelGrouping', 'date', 'fullVisitorId', 'visitId', 'visitNumber', 'visitStartTime', 'device_browser', 'device_operatingSystem', 'device_isMobile', 'device_deviceCategory', 'geoNetwork_continent', 'geoNetwork_subContinent', 'geoNetwork_country', 'geoNetwork_region', 'geoNetwork_metro', 'geoNetwork_city', 'geoNetwork_networkDomain', 'totals_visits', 'totals_hits', 'totals_pageviews', 'totals_bounces', 'totals_newVisits', 'totals_sessionQualityDim', 'totals_timeOnSite', 'totals_transactions', 'totals_transactionRevenue', 'totals_totalTransactionRevenue', 'trafficSource_campaign', 'trafficSource_source', 'trafficSource_medium', 'trafficSource_keyword', 'trafficSource_referralPath', 'trafficSource_isTrueDirect', 'trafficSource_adContent', 'trafficSource_adwordsClickInfo.page', 'trafficSource_adwordsClickInfo.slot', 'trafficSource_adwordsClickInfo.gclId', 'trafficSource_adwordsClickInfo.adNetworkType', 'trafficSource_adwordsClickInfo.isVideoAd', 'customDimensions_count', 'customDimensions_index', 'customDimensions_value', 'Date_Year', 'Date_Month', 'Date_Day', 'Date_Dayofweek', 'Date_Dayofyear', 'Date_Week', 'Date_Is_month_end', 'Date_Is_month_start', 'Date_Is_quarter_end', 'Date_Is_quarter_start', 'Date_Is_year_end', 'Date_Is_year_start', 'visitStartTime_datetime', 'Date_Hour', 'transactionRevenue', 'transactionRevenue_dollar', 'target_log_revenue']
+
+
+
+
+====================================================================================================
+CELL 3
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 1. Required columns check
+# ============================================================
+print("\n" + "=" * 80)
+print("1. REQUIRED COLUMNS CHECK")
+print("=" * 80)
+
+required_cols = ["fullVisitorId"]
+missing_required = [c for c in required_cols if c not in df_work.columns]
+
+if missing_required:
+    raise ValueError(f"Missing required columns: {missing_required}")
+
+df_work["fullVisitorId"] = df_work["fullVisitorId"].astype(str)
+
+print("fullVisitorId dtype:", df_work["fullVisitorId"].dtype)
+print("Unique fullVisitorId:", df_work["fullVisitorId"].nunique())
+print("Total rows:", len(df_work))
+
+[OUTPUT]
+
+
+================================================================================
+1. REQUIRED COLUMNS CHECK
+================================================================================
+fullVisitorId dtype: object
+Unique fullVisitorId: 1252748
+Total rows: 1608337
+
+
+
+
+====================================================================================================
+CELL 4
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 2. Date / time normalization
+# ============================================================
+print("\n" + "=" * 80)
+print("2. DATE / TIME CHECK")
+print("=" * 80)
+
+if "visitStartTime_datetime" in df_work.columns:
+    df_work["event_date"] = pd.to_datetime(df_work["visitStartTime_datetime"], errors="coerce")
+elif "date" in df_work.columns:
+    df_work["event_date"] = pd.to_datetime(df_work["date"], errors="coerce")
+elif "visitStartTime" in df_work.columns:
+    df_work["event_date"] = pd.to_datetime(df_work["visitStartTime"], unit="s", errors="coerce")
+else:
+    df_work["event_date"] = pd.NaT
+    print("WARNING: No date column found.")
+
+print("event_date missing:", df_work["event_date"].isna().sum())
+print("Min date:", df_work["event_date"].min())
+print("Max date:", df_work["event_date"].max())
+
+[OUTPUT]
+
+
+================================================================================
+2. DATE / TIME CHECK
+================================================================================
+event_date missing: 0
+Min date: 2016-08-02 07:00:09
+Max date: 2018-05-01 06:56:58
+
+
+
+
+====================================================================================================
+CELL 5
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 3. Revenue columns detection
+# ============================================================
+print("\n" + "=" * 80)
+print("3. REVENUE COLUMNS DETECTION")
+print("=" * 80)
+
+possible_revenue_cols = [
+    "transactionRevenue",
+    "transactionRevenue_dollar",
+    "totals_transactionRevenue",
+    "totals_totalTransactionRevenue",
+    "target_log_revenue"
+]
+
+existing_revenue_cols = [c for c in possible_revenue_cols if c in df_work.columns]
+
+print("Existing revenue-related columns:")
+print(existing_revenue_cols)
+
+if len(existing_revenue_cols) == 0:
+    raise ValueError("No revenue-related columns found.")
+
+for col in existing_revenue_cols:
+    df_work[col] = pd.to_numeric(df_work[col], errors="coerce")
+
+print("\nRevenue dtypes after numeric conversion:")
+print(df_work[existing_revenue_cols].dtypes)
+
+
+[OUTPUT]
+
+
+================================================================================
+3. REVENUE COLUMNS DETECTION
+================================================================================
+Existing revenue-related columns:
+['transactionRevenue', 'transactionRevenue_dollar', 'totals_transactionRevenue', 'totals_totalTransactionRevenue', 'target_log_revenue']
+
+Revenue dtypes after numeric conversion:
+transactionRevenue                float64
+transactionRevenue_dollar         float64
+totals_transactionRevenue         float64
+totals_totalTransactionRevenue    float64
+target_log_revenue                float64
+dtype: object
+
+
+
+
+====================================================================================================
+CELL 6
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 4. Choose canonical revenue source
+# ============================================================
+print("\n" + "=" * 80)
+print("4. CHOOSE CANONICAL REVENUE SOURCE")
+print("=" * 80)
+
+if "transactionRevenue" in df_work.columns:
+    revenue_col = "transactionRevenue"
+elif "totals_transactionRevenue" in df_work.columns:
+    revenue_col = "totals_transactionRevenue"
+elif "totals_totalTransactionRevenue" in df_work.columns:
+    revenue_col = "totals_totalTransactionRevenue"
+else:
+    raise ValueError(
+        "No valid raw revenue column found. Only target_log_revenue exists, cannot reconstruct raw revenue safely."
+    )
+
+print("Canonical revenue column used:", revenue_col)
+
+df_work[revenue_col] = df_work[revenue_col].fillna(0)
+df_work["revenue_raw"] = df_work[revenue_col]
+
+if "transactionRevenue_dollar" in df_work.columns:
+    df_work["revenue_dollar"] = df_work["transactionRevenue_dollar"].fillna(0)
+else:
+    df_work["revenue_dollar"] = np.nan
+
+print("Created columns: revenue_raw, revenue_dollar")
+
+
+[OUTPUT]
+
+
+================================================================================
+4. CHOOSE CANONICAL REVENUE SOURCE
+================================================================================
+Canonical revenue column used: transactionRevenue
+Created columns: revenue_raw, revenue_dollar
+
+
+
+
+====================================================================================================
+CELL 7
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 5. Revenue quality checks
+# ============================================================
+print("\n" + "=" * 80)
+print("5. REVENUE QUALITY CHECKS")
+print("=" * 80)
+
+def revenue_quality_report(data, col):
+    s = data[col]
+    return {
+        "column": col,
+        "dtype": str(s.dtype),
+        "n_rows": len(s),
+        "n_missing": int(s.isna().sum()),
+        "missing_rate": float(s.isna().mean()),
+        "n_zero": int((s.fillna(0) == 0).sum()),
+        "zero_rate": float((s.fillna(0) == 0).mean()),
+        "n_positive": int((s.fillna(0) > 0).sum()),
+        "positive_rate": float((s.fillna(0) > 0).mean()),
+        "n_negative": int((s.fillna(0) < 0).sum()),
+        "negative_rate": float((s.fillna(0) < 0).mean()),
+        "min": float(s.min()) if s.notna().any() else np.nan,
+        "max": float(s.max()) if s.notna().any() else np.nan,
+        "mean": float(s.mean()) if s.notna().any() else np.nan,
+        "median": float(s.median()) if s.notna().any() else np.nan,
+        "std": float(s.std()) if s.notna().any() else np.nan,
+        "n_unique": int(s.nunique(dropna=True))
+    }
+
+quality_df = pd.DataFrame([
+    revenue_quality_report(df_work, col)
+    for col in existing_revenue_cols
+])
+
+display(quality_df)
+
+print("\nDescriptive statistics for revenue_raw:")
+display(df_work["revenue_raw"].describe(percentiles=[
+    0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99
+]))
+
+print("\nTop 20 largest revenue_raw rows:")
+show_cols = ["fullVisitorId", "event_date", "revenue_raw"]
+if "transactionRevenue_dollar" in df_work.columns:
+    show_cols.append("transactionRevenue_dollar")
+
+display(
+    df_work.sort_values("revenue_raw", ascending=False)[show_cols].head(20)
+)
+
+
+[OUTPUT]
+
+
+================================================================================
+5. REVENUE QUALITY CHECKS
+================================================================================
+
+                           column    dtype   n_rows  n_missing  missing_rate  \
+0              transactionRevenue  float64  1608337          0           0.0   
+1       transactionRevenue_dollar  float64  1608337          0           0.0   
+2       totals_transactionRevenue  float64  1608337          0           0.0   
+3  totals_totalTransactionRevenue  float64  1608337          0           0.0   
+4              target_log_revenue  float64  1608337          0           0.0   
+
+    n_zero  zero_rate  n_positive  positive_rate  n_negative  negative_rate  \
+0  1590757   0.989069       17580       0.010931           0            0.0   
+1  1590757   0.989069       17580       0.010931           0            0.0   
+2  1590757   0.989069       17580       0.010931           0            0.0   
+3  1590757   0.989069       17580       0.010931           0            0.0   
+4  1590757   0.989069       17580       0.010931           0            0.0   
+
+   min           max          mean  median           std  n_unique  
+0  0.0  2.312950e+10  1.371436e+06     0.0  4.597711e+07      7009  
+1  0.0  2.312950e+04  1.371436e+00     0.0  4.597711e+01      7009  
+2  0.0  2.312950e+10  1.371436e+06     0.0  4.597711e+07      7009  
+3  0.0  4.708206e+10  1.568682e+06     0.0  7.046884e+07      8220  
+4  0.0  2.386437e+01  1.943090e-01     0.0  1.852491e+00      7009  
+
+Descriptive statistics for revenue_raw:
+
+count    1.608337e+06
+mean     1.371436e+06
+std      4.597711e+07
+min      0.000000e+00
+1%       0.000000e+00
+5%       0.000000e+00
+10%      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+90%      0.000000e+00
+95%      0.000000e+00
+99%      1.329000e+07
+max      2.312950e+10
+Name: revenue_raw, dtype: float64
+
+Top 20 largest revenue_raw rows:
+
+               fullVisitorId          event_date   revenue_raw  \
+1361871  1957458976293878100 2017-04-05 20:19:40  2.312950e+10   
+1472897  1957458976293878100 2017-02-14 18:30:28  1.785550e+10   
+1376484  5632276788326171571 2016-09-16 14:20:43  1.602375e+10   
+220100   1957458976293878100 2017-09-13 13:56:28  1.322940e+10   
+1518403  1957458976293878100 2017-08-23 15:12:37  1.229300e+10   
+649340   9417857471295131045 2017-07-18 19:00:09  1.058914e+10   
+516657   1957458976293878100 2017-08-02 17:20:28  9.925110e+09   
+893239   1957458976293878100 2017-03-24 18:36:00  8.677830e+09   
+549475   4471415710206918415 2017-04-27 13:31:56  8.248800e+09   
+979065   2050125810100188362 2017-09-01 19:23:06  7.427430e+09   
+356739   7496147812697146114 2016-12-13 01:35:07  6.996500e+09   
+799851   1957458976293878100 2017-04-07 15:20:02  6.826960e+09   
+1279076  6843604665836832262 2017-12-15 18:04:08  6.459950e+09   
+269004     79204932396995037 2017-06-19 20:27:28  6.248750e+09   
+710808   1957458976293878100 2017-04-18 15:05:22  5.614440e+09   
+897432   5469079519715865124 2017-05-31 20:08:06  5.601400e+09   
+43361    9026840718082010040 2017-06-21 13:12:03  5.498000e+09   
+446047   1957458976293878100 2017-09-27 15:02:18  5.390440e+09   
+386708   3887503293400405088 2017-12-06 23:02:38  5.279630e+09   
+795403   7675541360496267931 2017-12-11 15:28:03  4.977660e+09   
+
+         transactionRevenue_dollar  
+1361871                   23129.50  
+1472897                   17855.50  
+1376484                   16023.75  
+220100                    13229.40  
+1518403                   12293.00  
+649340                    10589.14  
+516657                     9925.11  
+893239                     8677.83  
+549475                     8248.80  
+979065                     7427.43  
+356739                     6996.50  
+799851                     6826.96  
+1279076                    6459.95  
+269004                     6248.75  
+710808                     5614.44  
+897432                     5601.40  
+43361                      5498.00  
+446047                     5390.44  
+386708                     5279.63  
+795403                     4977.66  
+
+
+
+====================================================================================================
+CELL 8
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 6. Revenue column consistency
+# ============================================================
+print("\n" + "=" * 80)
+print("6. REVENUE COLUMN CONSISTENCY CHECK")
+print("=" * 80)
+
+if {"transactionRevenue", "totals_transactionRevenue"}.issubset(df_work.columns):
+    tmp = df_work[["transactionRevenue", "totals_transactionRevenue"]].fillna(0).copy()
+    diff = (tmp["transactionRevenue"] - tmp["totals_transactionRevenue"]).abs()
+
+    print("transactionRevenue vs totals_transactionRevenue")
+    print("Rows different:", int((diff > 0).sum()))
+    print("Different rate:", float((diff > 0).mean()))
+    print("Max absolute diff:", diff.max())
+
+    if (diff > 0).sum() > 0:
+        print("\nSample different rows:")
+        display(
+            df_work.loc[diff > 0, [
+                "fullVisitorId",
+                "event_date",
+                "transactionRevenue",
+                "totals_transactionRevenue"
+            ]].head(20)
+        )
+
+if "transactionRevenue_dollar" in df_work.columns:
+    dollar_positive = df_work["transactionRevenue_dollar"].fillna(0) > 0
+    raw_positive = df_work["revenue_raw"].fillna(0) > 0
+
+    print("\nRaw revenue positive rows:", int(raw_positive.sum()))
+    print("Dollar revenue positive rows:", int(dollar_positive.sum()))
+    print("Rows where raw positive but dollar zero:", int((raw_positive & ~dollar_positive).sum()))
+    print("Rows where dollar positive but raw zero:", int((dollar_positive & ~raw_positive).sum()))
+
+    if raw_positive.sum() > 0 and dollar_positive.sum() > 0:
+        ratio = (
+            df_work.loc[raw_positive & dollar_positive, "revenue_raw"] /
+            df_work.loc[raw_positive & dollar_positive, "transactionRevenue_dollar"]
+        )
+        print("\nRaw / dollar ratio description:")
+        display(ratio.describe(percentiles=[0.01, 0.05, 0.5, 0.95, 0.99]))
+
+
+
+[OUTPUT]
+
+
+================================================================================
+6. REVENUE COLUMN CONSISTENCY CHECK
+================================================================================
+transactionRevenue vs totals_transactionRevenue
+Rows different: 0
+Different rate: 0.0
+Max absolute diff: 0.0
+
+Raw revenue positive rows: 17580
+Dollar revenue positive rows: 17580
+Rows where raw positive but dollar zero: 0
+Rows where dollar positive but raw zero: 0
+
+Raw / dollar ratio description:
+
+count    1.758000e+04
+mean     1.000000e+06
+std      6.377720e-11
+min      1.000000e+06
+1%       1.000000e+06
+5%       1.000000e+06
+50%      1.000000e+06
+95%      1.000000e+06
+99%      1.000000e+06
+max      1.000000e+06
+dtype: float64
+
+
+
+====================================================================================================
+CELL 9
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 7. Create official user-level target
+# ============================================================
+print("\n" + "=" * 80)
+print("7. CREATE USER-LEVEL TARGET")
+print("=" * 80)
+
+agg_dict = {
+    "n_rows": ("fullVisitorId", "size"),
+    "first_date": ("event_date", "min"),
+    "last_date": ("event_date", "max"),
+    "total_revenue_raw": ("revenue_raw", "sum"),
+    "max_session_revenue_raw": ("revenue_raw", "max"),
+    "mean_session_revenue_raw": ("revenue_raw", "mean"),
+    "n_revenue_sessions": ("revenue_raw", lambda x: int((x > 0).sum()))
+}
+
+if "visitId" in df_work.columns:
+    agg_dict["n_sessions"] = ("visitId", "nunique")
+else:
+    agg_dict["n_sessions"] = ("fullVisitorId", "size")
+
+user_target = (
+    df_work
+    .groupby("fullVisitorId", as_index=False)
+    .agg(**agg_dict)
+)
+
+user_target["target_log_revenue"] = np.log1p(user_target["total_revenue_raw"])
+user_target["is_buyer"] = (user_target["total_revenue_raw"] > 0).astype(int)
+
+if "transactionRevenue_dollar" in df_work.columns:
+    user_dollar = (
+        df_work
+        .groupby("fullVisitorId", as_index=False)
+        .agg(
+            total_revenue_dollar=(
+                "transactionRevenue_dollar",
+                lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum()
+            )
+        )
+    )
+    user_target = user_target.merge(user_dollar, on="fullVisitorId", how="left")
+    user_target["target_log_revenue_dollar"] = np.log1p(user_target["total_revenue_dollar"])
+else:
+    user_target["total_revenue_dollar"] = np.nan
+    user_target["target_log_revenue_dollar"] = np.nan
+
+print("User-level target shape:", user_target.shape)
+display(user_target.head())
+
+
+[OUTPUT]
+
+
+================================================================================
+7. CREATE USER-LEVEL TARGET
+================================================================================
+User-level target shape: (1252748, 13)
+
+         fullVisitorId  n_rows          first_date           last_date  \
+0  0000000259678714014       2 2017-11-28 23:33:21 2017-11-29 00:19:40   
+1  0000010278554503158       1 2016-10-21 05:57:46 2016-10-21 05:57:46   
+2  0000020424342248747       1 2016-12-01 07:55:01 2016-12-01 07:55:01   
+3  0000027376579751715       1 2017-02-12 02:24:53 2017-02-12 02:24:53   
+4  0000039460501403861       1 2017-03-27 15:45:16 2017-03-27 15:45:16   
+
+   total_revenue_raw  max_session_revenue_raw  mean_session_revenue_raw  \
+0                0.0                      0.0                       0.0   
+1                0.0                      0.0                       0.0   
+2                0.0                      0.0                       0.0   
+3                0.0                      0.0                       0.0   
+4                0.0                      0.0                       0.0   
+
+   n_revenue_sessions  n_sessions  target_log_revenue  is_buyer  \
+0                   0           2                 0.0         0   
+1                   0           1                 0.0         0   
+2                   0           1                 0.0         0   
+3                   0           1                 0.0         0   
+4                   0           1                 0.0         0   
+
+   total_revenue_dollar  target_log_revenue_dollar  
+0                   0.0                        0.0  
+1                   0.0                        0.0  
+2                   0.0                        0.0  
+3                   0.0                        0.0  
+4                   0.0                        0.0  
+
+
+
+====================================================================================================
+CELL 10
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 8. User-level target descriptive statistics
+# ============================================================
+print("\n" + "=" * 80)
+print("8. USER-LEVEL TARGET DESCRIPTIVE STATISTICS")
+print("=" * 80)
+
+print("Total users:", user_target["fullVisitorId"].nunique())
+print("Total rows:", len(df_work))
+print("Buyer users:", int(user_target["is_buyer"].sum()))
+print("Buyer user rate:", user_target["is_buyer"].mean())
+print("Zero-revenue users:", int((user_target["total_revenue_raw"] == 0).sum()))
+print("Zero-revenue user rate:", (user_target["total_revenue_raw"] == 0).mean())
+
+print("\nUser-level total_revenue_raw describe:")
+display(user_target["total_revenue_raw"].describe(percentiles=[
+    0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99
+]))
+
+print("\nUser-level target_log_revenue describe:")
+display(user_target["target_log_revenue"].describe(percentiles=[
+    0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99
+]))
+
+print("\nBuyer-only total_revenue_raw describe:")
+display(
+    user_target.loc[user_target["is_buyer"] == 1, "total_revenue_raw"]
+    .describe(percentiles=[0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99])
+)
+
+print("\nBuyer-only target_log_revenue describe:")
+display(
+    user_target.loc[user_target["is_buyer"] == 1, "target_log_revenue"]
+    .describe(percentiles=[0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99])
+)
+
+[OUTPUT]
+
+
+================================================================================
+8. USER-LEVEL TARGET DESCRIPTIVE STATISTICS
+================================================================================
+Total users: 1252748
+Total rows: 1608337
+Buyer users: 15391
+Buyer user rate: 0.012285790917247522
+Zero-revenue users: 1237357
+Zero-revenue user rate: 0.9877142090827524
+
+User-level total_revenue_raw describe:
+
+count    1.252748e+06
+mean     1.760714e+06
+std      1.174416e+08
+min      0.000000e+00
+1%       0.000000e+00
+5%       0.000000e+00
+10%      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+90%      0.000000e+00
+95%      0.000000e+00
+99%      1.919000e+07
+max      1.192475e+11
+Name: total_revenue_raw, dtype: float64
+
+User-level target_log_revenue describe:
+
+count    1.252748e+06
+mean     2.185937e-01
+std      1.964565e+00
+min      0.000000e+00
+1%       0.000000e+00
+5%       0.000000e+00
+10%      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+90%      0.000000e+00
+95%      0.000000e+00
+99%      1.676990e+01
+max      2.550447e+01
+Name: target_log_revenue, dtype: float64
+
+Buyer-only total_revenue_raw describe:
+
+count    1.539100e+04
+mean     1.433130e+08
+std      1.049965e+09
+min      1.000000e+04
+1%       3.400000e+06
+5%       9.975000e+06
+10%      1.399000e+07
+25%      2.349000e+07
+50%      4.718000e+07
+75%      1.022250e+08
+90%      2.589300e+08
+95%      4.910450e+08
+99%      1.500075e+09
+max      1.192475e+11
+Name: total_revenue_raw, dtype: float64
+
+Buyer-only target_log_revenue describe:
+
+count    15391.000000
+mean        17.792401
+std          1.210038
+min          9.210440
+1%          15.039286
+5%          16.115592
+10%         16.453853
+25%         16.972085
+50%         17.669481
+75%         18.442687
+90%         19.372068
+95%         20.012046
+99%         21.128779
+max         25.504467
+Name: target_log_revenue, dtype: float64
+
+
+
+====================================================================================================
+CELL 11
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 9. Skewness / kurtosis
+# ============================================================
+print("\n" + "=" * 80)
+print("9. SKEWNESS / KURTOSIS")
+print("=" * 80)
+
+print("Session-level revenue_raw skew:", df_work["revenue_raw"].skew())
+print("Session-level revenue_raw kurtosis:", df_work["revenue_raw"].kurtosis())
+
+print("User-level total_revenue_raw skew:", user_target["total_revenue_raw"].skew())
+print("User-level total_revenue_raw kurtosis:", user_target["total_revenue_raw"].kurtosis())
+
+print("User-level target_log_revenue skew:", user_target["target_log_revenue"].skew())
+print("User-level target_log_revenue kurtosis:", user_target["target_log_revenue"].kurtosis())
+
+
+[OUTPUT]
+
+
+================================================================================
+9. SKEWNESS / KURTOSIS
+================================================================================
+Session-level revenue_raw skew: 219.07750178462157
+Session-level revenue_raw kurtosis: 78057.65620773396
+User-level total_revenue_raw skew: 845.1142404431489
+User-level total_revenue_raw kurtosis: 849277.0749344262
+User-level target_log_revenue skew: 8.919328239714114
+User-level target_log_revenue kurtosis: 77.96050386848437
+
+
+
+
+====================================================================================================
+CELL 12
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 10. Compare existing target_log_revenue if available
+# ============================================================
+print("\n" + "=" * 80)
+print("10. COMPARE WITH EXISTING target_log_revenue COLUMN")
+print("=" * 80)
+
+if "target_log_revenue" in df.columns:
+    existing_target = df_work[["fullVisitorId", "target_log_revenue"]].copy()
+    existing_target["target_log_revenue"] = pd.to_numeric(
+        existing_target["target_log_revenue"],
+        errors="coerce"
+    )
+
+    existing_user_target = (
+        existing_target
+        .groupby("fullVisitorId", as_index=False)
+        .agg(
+            existing_target_max=("target_log_revenue", "max"),
+            existing_target_mean=("target_log_revenue", "mean"),
+            existing_target_sum=("target_log_revenue", "sum"),
+            existing_target_nunique=("target_log_revenue", "nunique")
+        )
+    )
+
+    compare_target = user_target.merge(existing_user_target, on="fullVisitorId", how="left")
+
+    compare_target["diff_recomputed_vs_existing_max"] = (
+        compare_target["target_log_revenue"] -
+        compare_target["existing_target_max"]
+    )
+
+    display(
+        compare_target[[
+            "fullVisitorId",
+            "target_log_revenue",
+            "existing_target_max",
+            "existing_target_mean",
+            "existing_target_sum",
+            "existing_target_nunique",
+            "diff_recomputed_vs_existing_max"
+        ]].head()
+    )
+
+    print("\nDifference describe:")
+    display(compare_target["diff_recomputed_vs_existing_max"].describe())
+
+    print("\nUsers with abs(diff) > 1e-6:")
+    print(int((compare_target["diff_recomputed_vs_existing_max"].abs() > 1e-6).sum()), "out of", len(compare_target))
+else:
+    print("No existing target_log_revenue column found.")
+
+[OUTPUT]
+
+
+================================================================================
+10. COMPARE WITH EXISTING target_log_revenue COLUMN
+================================================================================
+
+         fullVisitorId  target_log_revenue  existing_target_max  \
+0  0000000259678714014                 0.0                  0.0   
+1  0000010278554503158                 0.0                  0.0   
+2  0000020424342248747                 0.0                  0.0   
+3  0000027376579751715                 0.0                  0.0   
+4  0000039460501403861                 0.0                  0.0   
+
+   existing_target_mean  existing_target_sum  existing_target_nunique  \
+0                   0.0                  0.0                        1   
+1                   0.0                  0.0                        1   
+2                   0.0                  0.0                        1   
+3                   0.0                  0.0                        1   
+4                   0.0                  0.0                        1   
+
+   diff_recomputed_vs_existing_max  
+0                              0.0  
+1                              0.0  
+2                              0.0  
+3                              0.0  
+4                              0.0  
+
+Difference describe:
+
+count    1.252748e+06
+mean     5.900043e-04
+std      1.996424e-02
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      1.989659e+00
+Name: diff_recomputed_vs_existing_max, dtype: float64
+
+Users with abs(diff) > 1e-6:
+1436 out of 1252748
+
+
+
+
+====================================================================================================
+CELL 13
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 11. Potential issue flags
+# ============================================================
+print("\n" + "=" * 80)
+print("11. POTENTIAL ISSUE FLAGS")
+print("=" * 80)
+
+issues = []
+
+if df_work["revenue_raw"].isna().sum() > 0:
+    issues.append("revenue_raw still has missing values.")
+
+if (df_work["revenue_raw"] < 0).sum() > 0:
+    issues.append("Negative revenue values exist.")
+
+if user_target["is_buyer"].mean() < 0.01:
+    issues.append("Buyer rate is very low (<1%). Expect severe zero-inflation.")
+
+if user_target["target_log_revenue"].max() > 30:
+    issues.append("Very large log target detected. Check whether revenue is stored in micros.")
+
+if "transactionRevenue_dollar" in df_work.columns and df_work["transactionRevenue_dollar"].max() > 0:
+    raw_dollar_ratio = (
+        df_work.loc[
+            (df_work["revenue_raw"] > 0) &
+            (df_work["transactionRevenue_dollar"] > 0),
+            "revenue_raw"
+        ] /
+        df_work.loc[
+            (df_work["revenue_raw"] > 0) &
+            (df_work["transactionRevenue_dollar"] > 0),
+            "transactionRevenue_dollar"
+        ]
+    )
+
+    if len(raw_dollar_ratio) > 0:
+        median_ratio = raw_dollar_ratio.median()
+        if median_ratio > 100000:
+            issues.append(
+                f"Raw revenue seems much larger than dollar revenue. Median raw/dollar ratio = {median_ratio:.2f}. "
+                "This may indicate raw revenue is stored in micros."
+            )
+
+if len(issues) == 0:
+    print("No obvious critical issues found.")
+else:
+    print("Issues / warnings:")
+    for i, issue in enumerate(issues, 1):
+        print(f"{i}. {issue}")
+
+
+[OUTPUT]
+
+
+================================================================================
+11. POTENTIAL ISSUE FLAGS
+================================================================================
+Issues / warnings:
+1. Raw revenue seems much larger than dollar revenue. Median raw/dollar ratio = 1000000.00. This may indicate raw revenue is stored in micros.
+
+
+
+
+====================================================================================================
+CELL 14
+====================================================================================================
+
+[CODE]
+
+# ============================================================
+# 12. Final outputs
+# ============================================================
+print("\n" + "=" * 80)
+print("12. FINAL OUTPUTS")
+print("=" * 80)
+
+print("Input dataframe: df")
+print("Working dataframe created: df_work")
+print("User-level target dataframe created: user_target")
+print("Recommended modeling target column: target_log_revenue")
+print("Recommended raw user revenue column: total_revenue_raw")
+print("Recommended buyer classification column: is_buyer")
+
+display(user_target.head())
+
+# Optional save
+user_target.to_pickle("user_level_target_check.pkl")
+user_target.to_csv("user_level_target_check.csv", index=False)
+
+[OUTPUT]
+
+
+================================================================================
+12. FINAL OUTPUTS
+================================================================================
+Input dataframe: df
+Working dataframe created: df_work
+User-level target dataframe created: user_target
+Recommended modeling target column: target_log_revenue
+Recommended raw user revenue column: total_revenue_raw
+Recommended buyer classification column: is_buyer
+
+         fullVisitorId  n_rows          first_date           last_date  \
+0  0000000259678714014       2 2017-11-28 23:33:21 2017-11-29 00:19:40   
+1  0000010278554503158       1 2016-10-21 05:57:46 2016-10-21 05:57:46   
+2  0000020424342248747       1 2016-12-01 07:55:01 2016-12-01 07:55:01   
+3  0000027376579751715       1 2017-02-12 02:24:53 2017-02-12 02:24:53   
+4  0000039460501403861       1 2017-03-27 15:45:16 2017-03-27 15:45:16   
+
+   total_revenue_raw  max_session_revenue_raw  mean_session_revenue_raw  \
+0                0.0                      0.0                       0.0   
+1                0.0                      0.0                       0.0   
+2                0.0                      0.0                       0.0   
+3                0.0                      0.0                       0.0   
+4                0.0                      0.0                       0.0   
+
+   n_revenue_sessions  n_sessions  target_log_revenue  is_buyer  \
+0                   0           2                 0.0         0   
+1                   0           1                 0.0         0   
+2                   0           1                 0.0         0   
+3                   0           1                 0.0         0   
+4                   0           1                 0.0         0   
+
+   total_revenue_dollar  target_log_revenue_dollar  
+0                   0.0                        0.0  
+1                   0.0                        0.0  
+2                   0.0                        0.0  
+3                   0.0                        0.0  
+4                   0.0                        0.0  
+
+
