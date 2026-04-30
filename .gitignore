@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+/train_v2.csv
+/data_chunks
+/train_v2.csv.zip
