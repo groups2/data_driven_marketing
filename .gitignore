@@ -419,3 +419,18 @@ __marimo__/
 /data/*.pkl
 /data/*.csv
 /processed_chunks/
+/Notebooks/funnel_session_dataset.csv
+/Notebooks/funnel_chunks/
+/df_full.pkl
+/user_level_dataset.pkl
+@"
+# Large generated data files
+*.pkl
+*.csv
+Notebooks/funnel_chunks/
+user_level_dataset.pkl
+df_full.pkl
+Notebooks/funnel_session_dataset.csv
+"@ | Out-File -Encoding utf8 .gitignoreN o t e b o o k s / f u n n e l _ c h u n k s /  
+ p r o c e s s e d _ c h u n k s /  
+ 
