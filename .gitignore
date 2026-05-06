@@ -431,6 +431,5 @@ Notebooks/funnel_chunks/
 user_level_dataset.pkl
 df_full.pkl
 Notebooks/funnel_session_dataset.csv
-"@ | Out-File -Encoding utf8 .gitignoreN o t e b o o k s / f u n n e l _ c h u n k s /  
- p r o c e s s e d _ c h u n k s /  
- 
+Notebooks/feature_engineering.ipynb
+"@ | Out-File -Encoding utf8 .gitignore
