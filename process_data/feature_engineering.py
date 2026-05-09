@@ -1,36 +1,3 @@
-"""
-feature_engineering.py
-═══════════════════════════════════════════════════════════════
-MỤC ĐÍCH:
-  Chạy feature engineering cho cả 2 trường hợp:
-
-  MODE 1 — Kaggle train data (gộp toàn bộ train+val+test):
-    python feature_engineering.py --mode train
-    → Output: train_final.pkl (toàn bộ dữ liệu đã FE)
-    → Fit encoders từ toàn bộ train data
-    → Lưu artifacts để dùng lại cho Kaggle test
-
-  MODE 2 — Kaggle test data (không có target):
-    python feature_engineering.py --mode kaggle_test
-    → Output: kaggle_test_final.pkl
-    → Load artifacts đã fit từ train
-    → Apply FE (KHÔNG fit lại)
-
-WORKFLOW:
-  1. Chạy: python feature_engineering.py --mode train
-     → Fit encoders từ toàn bộ train data (không chia fold)
-     → FE toàn bộ data → train_final.pkl
-     → Lưu artifacts → fe_artifacts.pkl
-  
-  2. Chạy: python feature_engineering.py --mode kaggle_test
-     → Load fe_artifacts.pkl
-     → FE Kaggle test data → kaggle_test_final.pkl
-  
-  3. Train model trên train_final.pkl
-  4. Predict trên kaggle_test_final.pkl
-═══════════════════════════════════════════════════════════════
-"""
-
 import os
 import pickle
 import argparse

@@ -1,22 +1,3 @@
-"""
-process_data.py
-═══════════════════════════════════════════════════════════════
-Data Processing Pipeline - JSON parsing + Data cleaning
-
-Có thể import trực tiếp từ Jupyter notebook:
-    from process_data import run_full_pipeline
-
-    # Xử lý Kaggle test:
-    df = run_full_pipeline('../data/test_v2.pkl', stage='test')
-
-THAY ĐỔI SO VỚI PHIÊN BẢN CŨ:
-  - Bỏ handle_high_cardinality() khỏi pipeline
-  - Lý do: FE pipeline đã xử lý top-N grouping bằng elbow method
-    fit từ train data → nhất quán train/test, không hardcode số cứng
-  - handle_high_cardinality() vẫn giữ lại trong file nhưng KHÔNG gọi
-    trong preprocess_data() — chỉ để tham khảo nếu cần dùng độc lập
-═══════════════════════════════════════════════════════════════
-"""
 
 import pandas as pd
 import numpy as np
@@ -52,9 +33,7 @@ MEDIUM_FILL     = 'none'
 HIGH_NULL_FILL  = 'unknown'
 LOW_NULL_FILL   = 'unknown'
 
-# Columns to drop (high cardinality, low signal)
-# ⚠️ Không drop geoNetwork_networkDomain ở đây vì detect_and_remove_junk
-#    cần dùng nó — nó sẽ được drop cùng COLS_TO_DROP sau khi junk removed
+
 COLS_TO_DROP = [
     'trafficSource_adwordsClickInfo.gclId',
     'geoNetwork_networkDomain',
@@ -201,7 +180,6 @@ def clean_revenue(df):
 def detect_and_remove_junk(df):
     """
     Loại bỏ internal traffic, bot, tracking errors, fake whales.
-    ⚠️ Phải chạy TRƯỚC khi drop geoNetwork_networkDomain.
     """
     if VERBOSE:
         print("   > Detecting & removing junk...")
@@ -341,22 +319,6 @@ def add_network_type(df):
 
 
 def preprocess_data(df):
-    """
-    Pipeline preprocessing chính.
-
-    THỨ TỰ QUAN TRỌNG:
-      1. clean_revenue         — cần trước junk detection (dùng revenue)
-      2. detect_and_remove_junk — cần networkDomain → phải trước drop_cols
-      3. drop_low_signal_cols  — drop networkDomain và các cột rác
-      4. fill_missing_values
-      5. normalize_traffic_source
-      6. add_time_features     — feature engineering cần Date_Hour, Date_Dayofweek
-      7. add_network_type
-
-    KHÔNG CÒN handle_high_cardinality:
-      → Feature engineering xử lý top-N grouping bằng elbow method
-        fit từ train data → đảm bảo consistency train/test
-    """
     print("\n📊 PHASE 2: DATA CLEANING & PREPROCESSING\n")
 
     df = clean_revenue(df)
@@ -376,35 +338,6 @@ def preprocess_data(df):
 # ════════════════════════════════════════════════════════════
 
 def run_full_pipeline(input_path, output_dir='../data/', stage='train', chunk_size=None):
-    """
-    Pipeline đầy đủ: JSON parsing → Preprocessing → Save.
-
-    Args:
-        input_path  : đường dẫn file pickle gốc (raw Kaggle data)
-        output_dir  : thư mục lưu output
-        stage       : 'train' hoặc 'test'
-        chunk_size  : size chunk xử lý (mặc định = CHUNK_SIZE)
-
-    Returns:
-        DataFrame: dữ liệu sau xử lý, sẵn sàng cho feature engineering
-
-    Usage trong notebook:
-        from process_data import run_full_pipeline
-
-        # Kaggle test:
-        df_test = run_full_pipeline('../data/test_v2.pkl', stage='test')
-
-        # Rồi gọi feature engineering:
-        import pickle
-        with open('../data/fe_artifacts.pkl', 'rb') as f:
-            artifacts = pickle.load(f)
-
-        from feature_engineering import engineer_features
-        feature_end_date    = df_test['date'].max()
-        feature_window_days = (feature_end_date - df_test['date'].min()).days
-        X_test = engineer_features(df_test.copy(), feature_end_date, artifacts, feature_window_days)
-        X_test.to_pickle('../data/kaggle_test_final.pkl')
-    """
     print("=" * 70)
     print(f"🔄 FULL DATA PROCESSING PIPELINE ({stage.upper()})")
     print("=" * 70)
