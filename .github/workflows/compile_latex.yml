@@ -1,0 +1,40 @@
+name: Build and Save LaTeX PDF
+
+on:
+  push:
+    branches:
+      - main # Hoặc đổi thành 'master' tùy vào tên branch chính của bạn
+
+permissions:
+  contents: write # Cấp quyền để GitHub Action có thể push file lên repo
+
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: report.tex
+
+      - name: Commit and Push PDF
+        run: |
+          # Cấu hình user cho bot
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Tạo thư mục và copy file
+          mkdir -p reports
+          cp report.pdf reports/Group2_report.pdf
+          
+          # Kiểm tra nếu có thay đổi thì mới commit (để tránh lỗi nếu PDF không đổi)
+          git add reports/Group2_report.pdf
+          if git diff --staged --quiet; then
+            echo "No changes in PDF, skipping commit."
+          else
+            git commit -m "Update compiled PDF report [skip ci]"
+            git push
+          fi
