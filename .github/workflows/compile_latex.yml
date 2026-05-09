@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main # Hoặc đổi thành 'master' tùy vào tên branch chính của bạn
+    paths:
+      - 'report.tex'         # Chỉ chạy khi file này thay đổi
+      - 'images/**'        # Hoặc khi bạn thêm ảnh mới vào thư mục images
 
 permissions:
   contents: write # Cấp quyền để GitHub Action có thể push file lên repo
