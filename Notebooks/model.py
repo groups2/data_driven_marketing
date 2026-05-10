@@ -32,13 +32,26 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
     y_train_buy = (train_df['target_revenue'] > 0).astype(int)
     y_val_buy   = (val_df['target_revenue'] > 0).astype(int)
 
-    neg = (y_full_buy == 0).sum()
-    pos = (y_full_buy == 1).sum()
-    spw = np.sqrt(neg / pos)
+    # ── Class imbalance — unique users trên full Kaggle train ──
+    # Dùng unique để tránh đếm lặp do sliding window folds
+    unique_total  = full_df['fullVisitorId'].nunique()
+    unique_buyers = full_df[full_df['target_revenue'] > 0]['fullVisitorId'].nunique()
+    buyer_rate    = unique_buyers / unique_total
 
-    print(f"Negative: {neg:,} | Positive: {pos:,} | SPW: {spw:.2f}x")
-    print(f"Train: {len(train_df):,} | Val: {len(val_df):,} | "
-          f"Internal test: {len(int_df):,} | Kaggle test: {len(test_df):,}")
+    print(f"  Total:   {unique_total:,}")
+    print(f"  Buyers:  {unique_buyers:,}")
+    print(f"  Rate:    {buyer_rate:.4%}  ← class imbalance")
+
+    # ── SPW tính từ train_df vì classifier fit trên train_df ──
+    neg_train = (y_train_buy == 0).sum()
+    pos_train = (y_train_buy == 1).sum()
+    spw       = np.sqrt(neg_train / pos_train)
+
+    print(f"\nTrain observations: {len(train_df):,} "
+          f"(buyers: {pos_train:,} | non-buyers: {neg_train:,})")
+    print(f"SPW: {spw:.2f}x")
+    print(f"Val: {len(val_df):,} | Internal test: {len(int_df):,} "
+          f"| Kaggle test: {len(test_df):,}")
     print(f"Clf features: {len(clf_feat)} | Reg features: {len(reg_feat)}")
 
 
@@ -52,8 +65,9 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
     print(f"Buyers: {y_val_buy.sum()} / {len(y_val_buy):,} | true rate: {true_rate:.6f}")
     print(f"Baseline PR-AUC: {baseline_auc:.6f}\n")
 
-    p_sum    = np.zeros(len(test_df))
-    auc_list = []
+    p_sum     = np.zeros(len(test_df))
+    p_val_sum = np.zeros(len(val_df))
+    auc_list  = []
 
     for s in range(config['N_RUNS']):
         clf = XGBClassifier(
@@ -73,6 +87,7 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
         auc_list.append(auc_pr)
 
         iso = IsotonicRegression(out_of_bounds='clip').fit(p_val_raw, y_val_buy)
+        p_val_sum += iso.predict(p_val_raw)
 
         clf_full = XGBClassifier(
             max_depth=4, learning_rate=0.05, scale_pos_weight=spw,
@@ -85,11 +100,15 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
         print(f"  seed={s} | PR-AUC={auc_pr:.4f} | iter={clf.best_iteration}")
 
     p_avg            = p_sum / config['N_RUNS']
+    p_val_ens        = p_val_sum / config['N_RUNS']
     test_df['p_buy'] = p_avg
     calib_ratio      = p_avg.mean() / true_rate
 
-    print(f"\nEnsemble PR-AUC: {np.mean(auc_list):.4f} ± {np.std(auc_list):.4f}")
-    print(f"Baseline PR-AUC: {baseline_auc:.6f}")
+    ens_auc_val = average_precision_score(y_val_buy, p_val_ens)
+
+    print(f"\nMean PR-AUC (individual): {np.mean(auc_list):.4f} ± {np.std(auc_list):.4f}")
+    print(f"True Ensemble PR-AUC:     {ens_auc_val:.4f}")
+    print(f"Baseline PR-AUC:          {baseline_auc:.6f}")
     print(f"Mean p_buy: {p_avg.mean():.6f} | Calibration: {calib_ratio:.2f}x "
           f"{'✅' if 0.5 <= calib_ratio <= 2.0 else '⚠️'}")
 
@@ -112,6 +131,7 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
     print(f"p99_log: {p99:.4f} | Baseline RMSE: {baseline_reg:.4f}\n")
 
     e_sum     = np.zeros(len(test_df))
+    e_val_sum_b = np.zeros(len(val_b))
     rmse_list = []
 
     for s in range(config['N_RUNS']):
@@ -129,6 +149,7 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
         )
 
         p_val_b = reg_cal.predict(val_b[reg_feat]).clip(0, p99)
+        e_val_sum_b += p_val_b
         rmse    = np.sqrt(mean_squared_error(val_b['target_log_revenue'], p_val_b))
         rmse_list.append(rmse)
 
@@ -146,8 +167,12 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
     test_df['e_revenue']   = e_sum / config['N_RUNS']
     test_df['final_score'] = test_df['p_buy'] * test_df['e_revenue']
 
-    print(f"\nEnsemble RMSE: {np.mean(rmse_list):.4f} ± {np.std(rmse_list):.4f}")
-    print(f"Baseline RMSE: {baseline_reg:.4f}")
+    e_val_ens_b = e_val_sum_b / config['N_RUNS']
+    ens_rmse_val = np.sqrt(mean_squared_error(val_b['target_log_revenue'], e_val_ens_b))
+
+    print(f"\nMean RMSE (individual): {np.mean(rmse_list):.4f} ± {np.std(rmse_list):.4f}")
+    print(f"True Ensemble RMSE:     {ens_rmse_val:.4f}")
+    print(f"Baseline RMSE:          {baseline_reg:.4f}")
 
 
     # ── Combine ───────────────────────────────────────────
@@ -157,10 +182,14 @@ def run_inference_pipeline(config=DEFAULT_CONFIG):
 
     top_k      = int(len(test_df) * 0.10)
     top_idx    = test_df['final_score'].nlargest(top_k).index
-    lift_proxy = test_df.loc[top_idx, 'p_buy'].mean() / test_df['p_buy'].mean()
+    
+    # Kaggle test không có ground truth → chỉ in p_buy ratio làm proxy
+    p_buy_ratio = test_df.loc[top_idx, 'p_buy'].mean() / test_df['p_buy'].mean()
 
-    print(f"Users: {len(test_df):,} | Top 10%: {top_k:,}")
-    print(f"Lift@10%: {lift_proxy:.2f}x")
+    print(f"Kaggle test users: {len(test_df):,} | Top 10%: {top_k:,}")
+    print(f"Mean p_buy overall:  {test_df['p_buy'].mean():.6f}")
+    print(f"Mean p_buy top 10%:  {test_df.loc[top_idx, 'p_buy'].mean():.4f}")
+    print(f"p_buy ratio@10%:     {p_buy_ratio:.2f}x  (proxy, no ground truth)")
 
     test_df.to_pickle(config['OUTPUT_PATH'])
     print(f"\nSaved → {config['OUTPUT_PATH']}")
