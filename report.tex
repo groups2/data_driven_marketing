@@ -11,10 +11,33 @@
 \usepackage{cite}
 \usepackage{float}
 \usepackage{setspace}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{booktabs}
+% --- THÊM CÁC PACKAGE VÀ KHAI BÁO CẦN THIẾT ---
+\usepackage[table]{xcolor} % Để tô màu bảng
+\usepackage{enumitem}      % Để chỉnh leftmargin cho itemize
+\usepackage[many]{tcolorbox} % Tcolorbox nâng cao (cho enhanced)
+\hypersetup{hypertexnames=false}
+\hbadness=10000
+
+% Định nghĩa các màu bị thiếu
+\definecolor{tablerow}{gray}{0.92}
+\definecolor{codebg}{gray}{0.96}
+\definecolor{tableborder}{gray}{0.6}
+\definecolor{muted}{gray}{0.4}
+
+% Định nghĩa hộp insightbox
+\newtcolorbox{insightbox}{
+  colback=blue!5!white,     % Màu nền của hộp (xanh nhạt)
+  colframe=blue!75!black,   % Màu viền của hộp
+  boxrule=0.5pt,            % Độ dày viền
+  arc=4pt,                  % Độ cong của góc
+  left=10pt, right=10pt, top=10pt, bottom=10pt % Khoảng cách viền lề
+}
 
 \title{
-A Data-Driven Approach to Customer Lifetime Value Prediction and Marketing Optimization Using Machine Learning and A/B Testing
-\thanks{This work was conducted as part of the DDM -- Data-Driven Marketing course.}
+Data-Driven Marketing Campaigns with Google Analytics: Historical Segmentation, Predictive Customer Value and Experimentation
 }
 
 \author{
@@ -24,24 +47,47 @@ Group 2: & Nguyen Thi Van Anh, Vu Bui Dinh Tung, \\
          & Dao Khanh Linh, Nguyen Hong Nhung, Thieu Dieu Thuy
 \end{tabular}
 }
-
+\\
 \IEEEauthorblockA{
-DSEB-MFE, NEU \\
-Course: DDM -- Data-Driven Marketing \\
+DSEB 65B -- MFE, NEU \\
+Course: DDM -- Data-Driven Marketing
 }
 }
 
 \begin{document}
+\raggedbottom
 \maketitle
 
 \begin{abstract}
-Modern e-commerce platforms generate massive clickstream data characterized by sparsity, behavioral heterogeneity, and highly imbalanced transaction distributions. Traditional revenue prediction models often struggle to capture the complex relationship between customer engagement and purchasing behavior, particularly when only a small proportion of sessions generate revenue. This study proposes a business-oriented machine learning framework for customer conversion and revenue prediction using the Google Merchandise Store dataset from Google Analytics.
+Modern e-commerce platforms generate large-scale clickstream
+data characterized by sparsity, behavioral heterogeneity,
+and highly imbalanced transaction distributions. Traditional
+revenue prediction models often struggle to capture customer
+purchasing behavior when only a small proportion of sessions
+generate revenue. This study proposes a business-oriented
+machine learning framework for conversion and revenue
+prediction using the Google Merchandise Store dataset from
+Google Analytics.
 
-The proposed pipeline combines preprocessing of semi-structured JSON logs, exploratory behavioral analysis, and advanced feature engineering techniques including Recency-Frequency-Monetary (RFM) metrics, session velocity indicators, and temporal browsing patterns. To address the zero-inflated nature of transaction revenue, the study implements a two-stage XGBoost hurdle architecture consisting of a calibrated classifier for purchase propensity estimation and a weighted regressor for conditional revenue prediction.
+The proposed pipeline integrates behavioral feature
+engineering techniques, including Recency-Frequency-Monetary
+(RFM) metrics, session velocity indicators, and temporal
+browsing patterns. To address the zero-inflated nature of
+transaction revenue, the framework employs a two-stage
+XGBoost hurdle architecture consisting of a calibrated
+classifier for purchase probability estimation and a
+weighted regressor for conditional revenue prediction.
 
-Unlike conventional approaches evaluated only through statistical accuracy, this framework incorporates business-centric metrics such as Revenue Capture Curves and Lift analysis to measure commercial effectiveness. In addition, the predictive framework is connected to causal validation strategies through A/B testing, enabling practical deployment for marketing optimization and customer targeting.
-
-Experimental analysis demonstrates that behavioral engagement, acquisition channels, and temporal interaction patterns provide strong predictive signals for both conversion probability and revenue generation. The resulting framework offers an interpretable and scalable solution for intelligent e-commerce analytics and customer value prediction.
+Beyond conventional statistical evaluation, the framework
+incorporates business-oriented metrics such as Revenue
+Capture Curves and Lift analysis, while connecting
+predictive outputs with A/B testing strategies for campaign
+optimization and customer targeting. Experimental results
+show that behavioral engagement, acquisition channels, and
+temporal interaction patterns provide strong predictive
+signals for both conversion probability and revenue
+generation. The proposed framework offers an interpretable
+and scalable solution for intelligent e-commerce analytics.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -50,187 +96,1513 @@ E-commerce analytics, clickstream analysis, XGBoost, hurdle models, customer con
 
 %--------------------------------------------------
 \section{Introduction}
+The rapid growth of e-commerce platforms has transformed
+customer interactions into large-scale behavioral datasets.
+Every browsing session, product interaction, and marketing
+touchpoint generates clickstream information that may reveal
+purchasing intent and customer value. However, extracting
+meaningful insights from such data remains challenging due
+to semi-structured formats, noisy browsing behavior, and
+extreme transaction imbalance.
 
-The rapid growth of e-commerce platforms has transformed customer interactions into large-scale behavioral data ecosystems. Every browsing session, product interaction, and marketing touchpoint generates valuable clickstream information that can potentially reveal purchasing intent and customer value. However, extracting meaningful insights from such data remains challenging due to semi-structured formats, noisy traffic behavior, and severe transaction imbalance.
+The Google Merchandise Store dataset provides a realistic
+analytics environment collected from Google Analytics,
+containing session-level information related to devices,
+traffic sources, geographic attributes, and transaction
+activities. A major characteristic of the dataset is that
+only a very small proportion of sessions generate revenue,
+while the majority correspond to non-purchasing browsing
+behavior. This imbalance limits the effectiveness of
+conventional single-stage predictive approaches for purchase
+and revenue modeling.
 
-The Google Merchandise Store dataset provides a realistic analytics environment collected directly from Google Analytics, containing session-level information related to devices, traffic sources, geographic attributes, and transaction activities. A major challenge of the dataset is that only a very small proportion of sessions produce revenue, while the majority represent non-purchasing browsing behavior. This imbalance makes conventional single-stage regression models ineffective for commercial prediction tasks.
+To address these challenges, this study proposes an
+integrated analytical framework consisting of four major
+components. First, advanced feature engineering techniques
+are applied to extract behavioral signals from clickstream
+data, including RFM indicators, session velocity,
+engagement depth, and temporal browsing patterns. Second,
+a two-stage hurdle architecture based on XGBoost is
+introduced to separately model purchase probability and
+conditional transaction value through a calibrated
+classifier and weighted regressor. Third, the framework
+adopts business-oriented evaluation metrics such as Revenue
+Capture Curves and Lift analysis to assess practical
+commercial performance beyond conventional statistical
+accuracy measures. Finally, predictive modeling outputs are
+connected with causal validation through A/B testing
+strategies designed to support campaign optimization and
+customer targeting decisions.
 
-To address these limitations, this study proposes a framework built upon four key components. First, advanced feature engineering techniques are applied to extract behavioral signals from clickstream data, including RFM indicators, session velocity, engagement depth, and temporal browsing patterns. Second, a two-stage hurdle architecture based on XGBoost is introduced to separately model purchase probability and conditional transaction value through a calibrated classifier and weighted regressor. Third, the framework adopts business-centric evaluation metrics such as Revenue Capture Curves and Lift analysis to measure practical commercial performance beyond traditional statistical accuracy. Finally, the study connects predictive modeling with causal validation through A/B testing strategies to support real-world marketing optimization and customer targeting decisions.
+The objective of this research is to develop an
+interpretable and scalable framework capable of converting
+raw behavioral analytics data into actionable business
+insights for conversion prediction and revenue optimization.
+\section{About Data}
 
-The objective of this research is to develop an interpretable and scalable analytical framework capable of transforming raw behavioral analytics data into actionable business intelligence for conversion prediction and revenue optimization.
+This study uses the Google Merchandise Store dataset, a large-scale e-commerce clickstream dataset exported from Google Analytics. The data describe visits to the Google Merchandise Store, an online retail platform selling Google-branded products. Each record corresponds to one website session and is associated with a unique visitor identifier, allowing repeated visits by the same user to be observed over time. The original dataset contains 1,708,337 session records from 1,323,730 unique users, covering user activity from July 2016 to May 2018.
 
-%--------------------------------------------------
-\section{Exploratory Data Analysis}
+The dataset is particularly suitable for data-driven marketing analysis because it captures the full digital customer journey from acquisition to on-site engagement and, for a small subset of users, transaction generation. The primary predictive target is \textit{totals\_transactionRevenue}, which records purchase revenue at the session level. As is common in real-world e-commerce data, the target variable is highly zero-inflated: only 18,514 sessions, or approximately 1.08\% of all sessions, contain positive revenue before cleaning. At the user level, the post-cleaning data contain 1,272,948 unique visitors, of whom only 14,303 users generated revenue, corresponding to a buyer rate of 1.12\%. This imbalance makes the dataset appropriate for studying both conversion propensity and conditional customer value.
 
-The exploratory data analysis (EDA) process was conducted to understand the structural characteristics of the Google Merchandise Store dataset and uncover behavioral patterns associated with customer engagement, traffic acquisition, and transaction generation. Since the dataset originates from Google Analytics logs, the analysis focused not only on conventional statistical exploration but also on interpreting user behavior within a real-world e-commerce environment.
-
-Unlike clean benchmark datasets commonly used in academic experiments, the Google Merchandise Store dataset contains highly heterogeneous information embedded within nested JSON structures. Therefore, the initial stage of EDA concentrated on understanding the overall architecture of the data before performing any modeling-related operations.
-
-\subsection{Dataset Structure and Semi-Structured Characteristics}
-
-The dataset consists of session-level records collected from user interactions on the Google Merchandise Store platform. Each observation represents a single visit session and contains behavioral, geographical, transactional, and acquisition-related information.
-
-A major characteristic of the dataset is the presence of nested JSON attributes such as \textit{device}, \textit{geoNetwork}, \textit{totals}, and \textit{trafficSource}. These columns contain hierarchical structures rather than standard tabular values, requiring additional parsing and flattening procedures before analysis.
-
-From an analytical perspective, this structure reflects the complexity of modern digital analytics systems where customer behavior is distributed across multiple contextual dimensions including device usage, browsing source, geographic origin, and engagement intensity.
-
-After flattening the JSON columns, the dataset revealed several major groups of variables:
+The raw data combine conventional tabular identifiers with semi-structured Google Analytics fields. Core session identifiers include \textit{fullVisitorId}, \textit{visitId}, \textit{visitNumber}, \textit{visitStartTime}, and \textit{date}. In addition, several columns are stored as nested JSON objects rather than directly usable tabular variables. The most important JSON groups are \textit{device}, \textit{geoNetwork}, \textit{totals}, and \textit{trafficSource}. After parsing, these fields provide five main categories of information:
 
 \begin{itemize}
-    \item Device-related information such as browser type, operating system, and device category.
-    \item Geographic indicators including country, city, and continent.
-    \item Engagement metrics such as hits, pageviews, and visit counts.
-    \item Traffic acquisition variables including referral source, campaign, and channel grouping.
-    \item Transaction-related variables associated with purchases and revenue generation.
+    \item Session identification variables, which distinguish users, visits, visit order, and time of access.
+    \item Device variables, including browser, operating system, mobile indicator, and device category.
+    \item Geographic variables, including continent, sub-continent, country, region, metro area, city, and network domain.
+    \item Behavioral engagement variables, including hits, pageviews, bounces, session quality, time on site, transactions, and revenue.
+    \item Acquisition variables, including channel grouping, traffic source, medium, campaign, keyword, referral path, and advertising metadata.
 \end{itemize}
 
-This structure provides a comprehensive representation of the customer journey from acquisition to conversion.
+Exploratory inspection also showed that the dataset contains strong behavioral heterogeneity. Most visitors interact with only a small number of pages, whereas a limited group of highly engaged users generate many hits and pageviews. Revenue is similarly concentrated: among purchasing users, the top 1\% of buyers account for 28.0\% of revenue, while the top 20\% account for 75.3\%. These patterns motivate a modeling design that separates the probability of purchase from the magnitude of revenue conditional on purchase.
 
-\subsection{Data Quality Inspection and Missing Value Analysis}
+%--------------------------------------------------
 
-The next stage of EDA focused on evaluating data quality and identifying inconsistencies within the raw analytics logs.
+\section{Methodology}
 
-The analysis revealed that multiple attributes contained substantial proportions of missing values or placeholder categories such as \texttt{(not set)} and \texttt{(not provided)}. Missingness was particularly common in variables associated with marketing campaigns and geographic granularity.
+%--------------------------------------------------
+\subsection{Data preprocessing \& understanding}
 
-However, further inspection indicated that these missing values were not entirely random. For example, direct traffic sessions frequently lacked campaign metadata because users entered the website manually rather than through tracked advertising campaigns. Similarly, several geographic fields were unavailable due to browser privacy restrictions or incomplete tracking information.
+The preprocessing stage was designed to convert the raw Google Analytics export into a clean analytical table while preserving the behavioral meaning of the original tracking data. Because the dataset contains nested JSON columns, the first step was structural normalization. The fields \textit{device}, \textit{geoNetwork}, \textit{totals}, and \textit{trafficSource} were parsed using a safe JSON parser and flattened with \texttt{json\_normalize}. Each nested attribute was renamed with its parent prefix, such as \textit{device\_browser}, \textit{geoNetwork\_country}, \textit{totals\_pageviews}, and \textit{trafficSource\_medium}. This procedure transformed the semi-structured logs into a session-level feature matrix suitable for exploratory analysis and machine learning.
 
-This observation is important because it demonstrates that missing values in behavioral analytics datasets often carry implicit business meaning. Consequently, the analysis treated missingness as part of the behavioral context rather than simply removing incomplete observations.
+Two additional semi-structured fields were handled separately. The \textit{customDimensions} column was parsed to extract the first available dimension value when present, while the \textit{hits} column was summarized into a count variable representing the number of recorded hit objects in each session. Since the raw dataset is large, the parsing pipeline was implemented in chunks of 50,000 rows to reduce memory pressure and improve reproducibility.
 
-In addition to missing values, the dataset also contained highly sparse variables and several low-variance features with nearly constant values across sessions. Such attributes contribute minimal analytical value and increase dimensional complexity.
+After flattening, the preprocessing pipeline standardized invalid or non-informative placeholders. Values such as \textit{unknown.unknown}, \textit{(not set)}, \textit{not available in demo dataset}, \textit{(not provided)}, and \textit{(none)} were treated as missing values. Numeric session fields, including \textit{visitNumber}, \textit{totals\_hits}, \textit{totals\_pageviews}, \textit{totals\_transactionRevenue}, \textit{totals\_timeOnSite}, \textit{totals\_bounces}, \textit{totals\_sessionQualityDim}, and \textit{totals\_transactions}, were converted to numeric format and missing numeric entries were set to zero where absence represents no recorded activity. The \textit{date} field was converted from the original \textit{YYYYMMDD} format into a proper date variable.
 
-The EDA process therefore identified candidate variables for removal while preserving behaviorally informative attributes.
-
-\subsection{Revenue Distribution and Transaction Imbalance}
-
-One of the most significant findings obtained during exploration was the extremely imbalanced nature of transaction activity.
-
-The variable \textit{totals\_transactionRevenue} contained non-zero values in only approximately 1.08\% of all sessions. This indicates that the vast majority of users visited the platform without completing a purchase.
-
-From a business perspective, this pattern is consistent with real-world e-commerce ecosystems where browsing behavior heavily outweighs actual conversion activity. Most visitors explore products, compare options, or navigate informational pages before leaving the platform.
-
-From a data science perspective, this imbalance creates substantial modeling challenges because conventional algorithms tend to prioritize the dominant zero-revenue observations while underrepresenting high-value purchasing sessions.
-
-Furthermore, the revenue distribution exhibited strong positive skewness, where a small subset of customers generated disproportionately large transaction values.
-
-To better understand this behavior, the analysis examined both the raw revenue distribution and the logarithmically transformed revenue variable:
+Revenue required special treatment because Google Analytics exports monetary values in micro-units. Therefore, \textit{totals\_transactionRevenue} was divided by $10^{6}$ when values indicated micro-unit encoding. A logarithmic target variable was then created as
 
 \begin{equation}
- y' = \log(1 + revenue)
+\textit{target\_log\_revenue}=\log(1+\textit{totals\_transactionRevenue}),
 \end{equation}
 
-The transformed distribution significantly reduced the influence of extreme outliers and revealed clearer patterns among revenue-generating sessions.
+which reduces the effect of extreme transaction values. In the exploratory analysis, this transformation reduced revenue skewness from 24.89 to 0.38, making the distribution more stable for downstream modeling.
 
-\subsection{User Engagement and Browsing Behavior}
+The next step was a data-quality audit intended to remove observations that do not represent genuine customer behavior. Internal traffic was identified using network domains containing \texttt{google} and sessions from Mountain View, which are likely to include testing or employee activity. Bot-like behavior was detected using abnormal engagement patterns, including more than 500 hits with zero time on site, more than 500 pageviews with a bounce flag, and browser strings associated with automated traffic. The pipeline also checked for tracking errors, such as bounced sessions with positive revenue, and unrealistic ``fake whale'' sessions with revenue but no meaningful engagement. This cleaning step reduced the dataset from 1,708,337 to 1,623,718 sessions.
 
-After analyzing the target variable, the EDA process investigated customer engagement patterns through variables such as \textit{totals\_hits}, \textit{totals\_pageviews}, and session frequency.
+Missing values were not treated as purely random noise because, in digital analytics, missingness often reflects the acquisition context. For example, direct sessions commonly lack campaign metadata because the user did not arrive through a tracked campaign link. Accordingly, missing values were filled according to feature semantics: campaign values were replaced with \textit{no\_campaign}, traffic medium with \textit{none}, and high-missing geographic fields such as metro, city, and region with \textit{unknown}. Lower-missing categorical variables, including operating system, country, sub-continent, continent, source, and browser, were also filled with \textit{unknown}.
 
-The distributions of hits and pageviews were heavily right-skewed. Most users interacted with only a small number of pages, while a limited subset demonstrated very deep browsing activity.
+Several variables were removed because they were either too sparse, too granular, or redundant for generalizable modeling. The dropped columns include \textit{trafficSource\_adwordsClickInfo.gclId}, \textit{geoNetwork\_networkDomain}, \textit{trafficSource\_keyword}, \textit{etc}. Specifically, variables related to advertising metadata were dominated by missing or placeholder values, while \textit{geoNetwork\_networkDomain} and \textit{trafficSource\_referralPath} were highly granular identifiers with limited generalizable signal. After this step, the preprocessed dataset contained 53 columns.
 
-A detailed comparison between purchasing and non-purchasing sessions revealed that high-engagement users consistently generated greater conversion.
+Next, acquisition and temporal variables were standardized to improve interpretability. Traffic sources were grouped using regular-expression rules into broader categories such as Google, YouTube, Yahoo, Facebook, Bing, Reddit, Pinterest, Baidu, and direct traffic. Additional calendar features were derived from the session date, including month, year, and day of week. These transformations produced a cleaned session-level dataset that retains the main behavioral, geographic, device, revenue, and acquisition signals required for customer segmentation and revenue prediction.
+
+Finally, the \textit{hits} field required additional processing because it contains the most detailed behavioral information in the Google Analytics dataset. Unlike the main session-level columns, \textit{hits} is stored as a list of nested event objects, where each object may contain page paths, hit types, product information, and e-commerce actions. Therefore, this column was not simply flattened in the same way as other JSON fields. Instead, it was parsed separately to reconstruct the user's within-session journey. From this process, several sequential features were extracted, such as \textit{page\_path\_sequence}, \textit{action\_type\_sequence}. These variables preserve the order of user actions and make it possible to analyze how customers move from browsing to product interaction and purchase behavior.
+
+Based on the extracted hit sequences, additional funnel indicators were created to summarize key behavioral milestones in each session. These include whether a session contained a product view, add-to-cart action, checkout action, purchase action, cart page visit, or checkout page visit. The pipeline also derived abandonment-related variables such as \textit{cart\_abandonment} and \textit{checkout\_abandonment}, which identify sessions where users reached an important funnel stage but did not complete the next step. This transformation is important because it converts the raw \textit{hits} column from a complex nested object into interpretable session-level signals. As a result, the processed dataset can support not only revenue prediction and segmentation, but also funnel diagnosis and campaign design, especially for identifying where users drop off before conversion.
+\subsection{Historical Data Customer Segmentation}
+
+The customer segmentation framework was developed to transform longitudinal behavioral data into discrete, actionable cohorts. Unlike traditional segmentation models that apply a single set of rules to the entire population, this methodology utilizes a dual-pathway approach. The user base is first partitioned into two primary groups based on historical conversion: \textit{Buyers}, defined by a transaction count greater than zero, and \textit{Non-buyers}, representing visitors who have engaged with the platform but not yet converted. This bifurcation ensures that the clustering algorithm identifies patterns within homogeneous populations, preventing transaction-heavy features from masking subtle engagement signals in the non-converting majority.
+
+\subsubsection{Feature Selection and Behavioral Scoring}
+
+To capture the multidimensional nature of user behavior, a specialized feature set was engineered for each pathway. For the Buyer group, the segmentation utilizes eight behavioral markers: Recency, Frequency, Monetary value, Loyalty (relationship lifetime), Engagement, Bounce rate, Funnel depth, and a purchase-based Hibernation score. The Non-buyer group is evaluated using a refined subset of six features, focusing strictly on engagement, navigation patterns, and site-level activity.
+
+
+The detailed K-Means feature definitions and scoring directions are reported in Appendix~\ref{app:kmeans_features}.
+
+To ensure all features reside on a comparable scale while maintaining business interpretability, a \textit{base-aware scoring} mechanism was implemented. This method evaluates user performance relative to a defined baseline, rather than using raw values or simple min-max scaling. The scoring pipeline consists of four distinct phases:
+
+\begin{itemize}
+
+\item Directional Assignment: Each feature is assigned
+a business directionality. Features such as Monetary and
+Frequency are categorized as \textit{higher-is-better},
+while Recency and Bounce Rate are classified as
+\textit{lower-is-better}. A special category,
+\textit{positive-lower-is-better}, is reserved for
+gap-based metrics such as inter-purchase time.
+
+\item Distance-to-Base Calculation: A baseline ($b$)
+is established for each feature, representing the minimum
+expected level of activity (e.g., a baseline of 1 session
+or 0 days of lifetime). The distance ($d$) for a user value
+($x$) is calculated as:
+
+\begin{equation}
+d =
+\begin{cases}
+\max(x - b, 0)
+& \text{for higher-better features} \\
+
+\max(b - x, 0)
+& \text{for lower-better features}
+\end{cases}
+\end{equation}
+
+For gap-based metrics, the distance is calculated as the
+inverse of the value ($1/x$) when $x > 0$, ensuring that
+smaller gaps produce larger distances.
+
+\item Percentile Normalization: Raw distances are
+converted into percentile ranks ($p$) within each respective
+group ($p \in [0,1]$). This non-linear transformation
+reduces the impact of outliers and ensures that the final
+scores reflect a user's relative standing within the
+population.
+
+\item Integer Mapping: Percentiles are mapped to a
+discrete 1--5 scale using the floor function
+$\lfloor p \times 5 \rfloor + 1$. The resulting score acts
+as an intuitive "star-rating" system, where 1 represents
+baseline-level performance and 5 corresponds to the top
+20\% of the group.
+
+\end{itemize}
+
+\subsubsection{Clustering Implementation and Optimization}
+
+The K-Means algorithm was selected as the primary clustering engine due to its efficiency with high-dimensional behavioral data. Prior to clustering, the 1--5 feature scores were standardized to a mean of zero and unit variance to prevent any single dimension from dominating the Euclidean distance calculations.
+
+The determination of the optimal number of clusters ($k$) was treated as a model selection problem, utilizing the Elbow Method in conjunction with three secondary validation indices. The Within-Cluster Sum of Squares (WCSS), also known as inertia, was plotted across a range of $k$ values to identify the "elbow point" where the marginal gain in information significantly diminishes. To ensure the robustness of the selected $k$, the following metrics were evaluated:
+\begin{itemize}
+\item Silhouette Coefficient: Measuring how similar an observation is to its own cluster compared to others, with a goal of maximizing this value.
+\item Davies-Bouldin Index: Assessing the average similarity between each cluster and its most similar one; lower values indicate better separation.
+\item Calinski-Harabasz Score: Evaluating the ratio of the sum of between-clusters scatter to within-cluster scatter.
+\end{itemize}
+
+By triangulating these indices, the methodology ensures that the resulting segments are not only statistically distinct but also possess enough density to be actionable for downstream marketing operations, such as personalized remarketing or retention modeling.
+
+\subsection{Training Customer Revenue Prediction \& Segmentation}
+\subsubsection{Data Splitting Strategy}
+
+To ensure temporal integrity throughout training and evaluation,
+the dataset is partitioned using a sliding-window cross-validation
+scheme rather than a random split. The following subsections describe
+the rationale, construction, and role of each fold.
+
+The data is partitioned chronologically rather than randomly to
+prevent temporal data leakage. User behavior shifts according to
+seasons, promotions, and trends. A random split would allow the
+model to train on December data while validating on June data --
+an unrealistic scenario that inflates evaluation metrics and does
+not reflect real-world deployment.
+
+A sliding-window strategy is applied across the full labeled period
+(2016-08-01 to 2018-04-30), producing 7 folds with the following
+parameters: a 168-day feature window, a 92-day
+target window, and a 60-day slide between consecutive
+folds. For each fold, one observation per visitor is created by
+aggregating session behavior within the feature window; the label
+(\textit{target\_revenue}) is the total revenue generated within
+the subsequent target window. Purchases within the feature window
+are used only as behavioral features -- never as labels -- to
+prevent leakage.
+
+Because consecutive feature windows overlap by 108 days
+(168 $-$ 60), the same visitor may appear across multiple folds
+with different features and different labels.
+This overlap is intentional: it increases the number of training
+observations without requiring additional data, while still
+preserving temporal ordering within each fold.
+The resulting dataset is at the observation level, not
+the user level.
+
+\begin{table}[H]
+\centering
+\caption{Sliding-Window Fold Schedule}
+\label{tab:folds}
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+\begin{tabular}{|c l c c|}
+\hline
+\textbf{Fold} & \textbf{Role} & \textbf{Feature Window}
+  & \textbf{Target Window} \\
+\hline
+1 & Train & 2016-08-01 $\to$ 2017-01-16 & 2017-01-16 $\to$ 2017-04-18 \\
+2 & Train & 2016-09-30 $\to$ 2017-03-17 & 2017-03-17 $\to$ 2017-06-17 \\
+3 & Train & 2016-11-29 $\to$ 2017-05-16 & 2017-05-16 $\to$ 2017-08-16 \\
+4 & Train & 2017-01-28 $\to$ 2017-07-15 & 2017-07-15 $\to$ 2017-10-15 \\
+5 & Train & 2017-03-29 $\to$ 2017-09-13 & 2017-09-13 $\to$ 2017-12-14 \\
+6 & Validation & 2017-05-28 $\to$ 2017-11-12
+  & 2017-11-12 $\to$ 2018-02-12 \\
+7 & Internal Test & 2017-07-27 $\to$ 2018-01-11
+  & 2018-01-11 $\to$ 2018-04-13 \\
+\hline
+\end{tabular}
+\end{table}
+
+Folds~1-5 serve as the training set (1,577,139 observations from
+769,507 unique visitors) and are used to fit model weights.
+Fold~6 acts as the validation set -- each of its 337,206 visitors
+appears exactly once, making it the cleanest fold for early stopping,
+metric evaluation, and isotonic probability calibration.
+Fold~7, despite covering the period closest to the evaluation window,
+yields zero buyer observations and cannot be used for formal scoring;
+its feature data is therefore incorporated into the final refit to
+ensure the model captures the most recent behavioral patterns.
+
+\subsubsection{Feature Engineering}
+
+After completing the exploratory analysis stage, the next objective
+was to transform raw session-level clickstream data into
+customer-level behavioral representations suitable for downstream
+machine learning models. To avoid temporal leakage, all features
+were constructed exclusively from sessions within the historical
+feature window of each fold.
+
+After completing the exploratory analysis stage, the next
+objective was to transform raw session-level clickstream
+data into customer-level behavioral representations suitable
+for downstream machine learning models. To avoid temporal
+leakage, all features were constructed exclusively from
+sessions within the historical feature window of each fold.
+
+\begin{itemize}
+
+\item Categorical Standardization and Target Encoding: High-cardinality categorical variables -- including geographic
+attributes, traffic sources, browser information, and campaign
+identifiers -- were first standardized via Top-$N$ grouping,
+where the optimal $N$ per column was selected automatically
+using elbow detection on marginal Gini impurity reduction.
+Infrequent categories were collapsed into a shared
+\textit{Other} class to reduce sparsity. Target encoding was
+then applied at the session level, replacing each category
+with the mean transaction revenue observed in training
+sessions.
+
+\item Customer-Level Aggregation Features: Session-level interactions were aggregated by
+\textit{fullVisitorId} using sum, mean, max, and count
+operators over engagement signals and transaction variables
+(such as \textit{totals\_hits},
+\textit{totals\_pageviews},
+\textit{totals\_timeOnSite},
+\textit{totals\_transactions},
+\textit{totals\_transactionRevenue}).
+Target-encoded categorical variables were additionally
+aggregated using mean, max, and last to capture both average
+and most recent behavioral context. The mean hits per session
+was retained as \textit{funnel\_depth}, serving as a proxy
+for browsing depth within individual visits.
+
+\item RFM, Lifetime, and Hibernation Features: Recency-Frequency-Monetary features were constructed from
+historical session data, measuring temporal distance since
+last visit, repeated interaction frequency, and aggregated
+revenue statistics. A \textit{hibernation\_flag} was derived
+by comparing each customer's recency against a data-driven
+threshold, flagging customers at risk of disengagement.
+
+Beyond standard RFM metrics, probabilistic lifetime features
+were generated using the BG/NBD and Gamma-Gamma models,
+producing \textit{p\_alive},
+\textit{expected\_purchases\_92d}, and
+\textit{expected\_monetary} as forward-looking behavioral
+estimates.
+
+\item Behavioral Diversity, Velocity, and Temporal Features: To capture cross-channel diversity, the number of unique
+values per customer was computed across seven dimensions --
+city, country, traffic source, medium, channel, browser, and
+operating system -- and summarized into a composite
+\textit{diversity\_score}. Velocity-based indicators
+(\textit{vel\_pageviews},
+\textit{vel\_hits},
+\textit{vel\_sessions})
+were constructed by comparing activity in the last 30 days
+against the preceding 90-day period, capturing changes in
+engagement intensity over time.
+
+Finally, temporal features
+and interaction terms were included to model cyclical browsing preferences and
+non-linear engagement relationships.
+
+\end{itemize}
+
+\vspace{0.5em}
+\subsubsection{Customer Revenue Prediction Model}
+
+The core task is to predict the future revenue each visitor will
+generate, using only their past behavioral signals. Across the full
+labeled dataset, 1,377 of 1,043,941 unique visitors made at least
+one purchase -- a buy rate of \text{0.13\%}. This extreme class
+imbalance is the defining challenge of the modeling problem.
+
+A traditional single-stage regression model is ineffective in this
+setting: because 99.87\% of revenue values are zero, such a model
+is dominated by the zero-revenue mass and learns to predict near-zero
+for everyone, destroying the revenue signal from the minority of
+actual buyers. The problem is therefore formulated as a
+\text{two-stage process}:
+
+\begin{itemize}
+
+\item Who will buy? -- A classifier estimates the
+probability that a visitor will make a purchase
+(\textit{p\_buy}).
+
+\item If they buy, how much? -- A regressor, trained
+exclusively on buyers, estimates the expected log-revenue
+(\textit{e\_revenue}).
+
+\end{itemize}
+
+The outputs from both stages are combined to form a composite ranking score:
+\begin{equation}
+\mathit{final\_score} = \mathit{p\_buy} \times \mathit{e\_revenue}
+\end{equation}
+
+\vspace{0.5em}
+\noindent\text{a. Stage 1 -- Classification}
+\vspace{0.3em}
+
+An XGBoost Classifier is trained to estimate $p\_buy$ for each
+visitor. To handle the severe class imbalance,
+\textit{scale\_pos\_weight} is set to
+$\sqrt{N_{\text{neg}} / N_{\text{pos}}}$
+so that the minority class is upweighted without fully inverting
+the class distribution. After each seed, Isotonic
+Regression is fit on Validation set predictions to calibrate
+output probabilities against the true observed buyer rate.
+The model is evaluated using PR-AUC, optimized via early stopping
+on the Validation set across 5 random seeds.
+
+The true ensemble PR-AUC of \text{0.0894} represents a
+120 times improvement over the random-guess baseline (0.000744),
+with a calibration ratio of 1.01 confirming that predicted
+$p\_buy$ closely matches the true buyer rate.
+
+\vspace{0.5em}
+\noindent\text{b. Stage 2 -- Regression}
+\vspace{0.3em}
+
+An XGBoost Regressor is trained exclusively on the 1,465 buyer
+observations in the Train set. The target is transformed to
+$\log(1 + \text{revenue})$ to reduce right-skew and stabilize
+gradient updates. Predictions are clipped at the 99th percentile
+of log-revenue ($p_{99} = 21.58$) to prevent extreme values from
+dominating the composite score.
+
+Both stages are run across 5 random seeds. For each seed, the model
+is first fit on the Train set with Validation-based early stopping,
+then refit on the full labeled data (Folds 1--7) using best iteration before predicting on the evaluation set.
+Final outputs are unweighted averages across all 5 seeds.
+
+The regression stage reduces RMSE from the naive baseline of 18.02
+down to \text{1.1961} -- a 93\% reduction -- confirming
+meaningful revenue signal despite training on only 1,465
+observations. The $R^2$ of 0.166, while modest, is expected: revenue
+is inherently noisy and driven by rare high-value transactions; the
+primary objective of this stage is to rank buyers by relative
+spending, not to achieve precise point predictions.
+
+\begin{table}[H]
+\centering
+\caption{Model Performance vs.\ Naive Baseline}
+\label{tab:model_results}
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+\begin{tabular}{|l c c c|}
+\toprule
+\textbf{Metric} & \textbf{Baseline} & \textbf{Mean $\pm$ std}
+  & \textbf{True Ensemble} \\
+\midrule
+PR-AUC
+  & 0.000744 & $0.0781 \pm 0.0016$ & \textbf{0.0894} \\
+RMSE (log-revenue)
+  & 18.02 & $1.2017 \pm 0.0058$ & \textbf{1.1961} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.5em}
+\noindent\text{c. Customer Segmentation via K-Means}
+\vspace{0.3em}
+
+The predicted \textit{p\_buy} and \textit{e\_revenue} scores are used as two
+independent axes for K-Means clustering, applied to the 119,207
+evaluation-set users with $\textit{final\_score} > 0$. Both
+features are standardized prior to
+clustering to prevent the higher-magnitude \textit{e\_revenue} values
+from dominating the distance metric.
+
+The optimal number of clusters is selected by evaluating $k \in
+\{2, \ldots, 10\}$ using Silhouette score, Davies-Bouldin index,
+and Calinski-Harabasz score on a stratified sample of 30,000
+observations. $k = 2$ yields the clearest separation (Silhouette
+= 0.397) while remaining interpretable for marketing purposes,
+and is selected as the final configuration.
+
+\begin{table}[H]
+\centering
+\caption{K-Means Cluster Profile ($k = 2$)}
+\label{tab:kmeans_profile}
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+\begin{tabular}{|l c c c|}
+\hline
+\textbf{Cluster} & \textbf{Size} & \textbf{Share (\%)}
+  & \textbf{Avg $p\_buy$} \\
+\hline
+High-Value (Stars)
+  & 2{,}462 & 2.1\% & 0.0402 \\
+\hline
+Low-Priority
+  & 116{,}745 & 97.9\% & 0.0010 \\
+\hline
+\end{tabular}
+\end{table}
+
+The two clusters differ substantially across both dimensions. The
+Stars cluster, comprising only 2.1\% of users, exhibits an
+average purchase probability approximately 39 times higher than the
+Low-Priority segment (0.040 vs.\ 0.001), and an average expected
+revenue per user of \$2.42 compared to \$0.05 -- a gap of nearly
+48 times. Despite representing a small minority of the evaluation
+set, this segment accounts for a disproportionate share of total
+predicted revenue and constitutes the primary target for downstream
+marketing interventions.
+
+\subsection{Strategy Marketing Framework}
+The strategy section operationalizes three interconnected analytical workstreams. The historical RFM-based segmentation establishes behavioral archetypes across the existing customer base, informing customer relationship management priorities. A funnel drop-off analysis then identifies the highest-friction transition point within the conversion path, motivating a site-wide UX intervention evaluated through a controlled A/B experiment. Finally, a predictive CLV model re-partitions the active user base according to forward-looking purchase probability and expected revenue contribution, enabling targeted campaign allocation toward users with the greatest economic potential. While the funnel experiment optimizes the platform experience broadly, the predictive campaign targets specific high-value users with personalized conversion strategies — the two levers operating at complementary levels of the marketing stack.
+\subsubsection{Funnel Strategy for Highest Drop-off Point}
+
+\label{sec:funnel_strategy_highest_dropoff}
+The final stage of the proposed framework involves translating predictive insights into a controlled marketing experiment. This phase focuses on the strategic optimization of the conversion funnel, specifically targeting the transition from product viewing to cart addition.
+
+The treatment variant of the experiment is designed with a multi-layered approach to address psychological friction and enhance user intent. The optimization techniques are structured around three core pillars:
+\begin{itemize}
+    \item Information Architecture and Visual Hierarchy: This technique focuses on improving product discovery by optimizing the presentation of core product attributes. It involves the refinement of imagery, product titles, and the strategic placement of value propositions to reduce cognitive load during the browsing process.
+    \item Trust and Social Proof Integration: To reduce perceived risk, the interface incorporates qualitative validation signals. This includes the prominent display of customer ratings, verified reviews, and trust badges, providing the external validation necessary to move a user from interest to intent.
+    \item Urgency and Scarcity Modeling: Psychological triggers such as real-time inventory alerts (e.g., "limited stock") and countdown timers for time-sensitive promotional offers are utilized to leverage loss aversion. These elements are designed to provide a gentle nudge towards immediate action within the session.
+\end{itemize}
+
+To ensure the observed impact is causal rather than coincidental, the framework employs a randomized A/B testing design. The methodology follows a rigorous statistical protocol:
+\begin{itemize}
+    \item Primary Metric: The success of the intervention is measured by the \textit{Add-to-Cart (ATC) Rate}, defined as the proportion of sessions where at least one "Add to Cart" action is recorded out of the total sessions that viewed a product page. This binary metric is selected for its high sensitivity to PDP modifications and its position as a leading indicator of final conversion.
+    \item Secondary Metrics: To explain the mechanism behind shifts in the primary metric, a suite of behavioral indicators is monitored. These include \textit{Average Time-on-Product-Page} to assess content engagement and \textit{Trust Signal Interaction Rate} (e.g., clicks on reviews or warranty badges). These metrics provide the necessary insights to confirm whether the observed lift is due to the specific optimizations or external noise.
+    \item Guardrail Metrics: To ensure that the optimization of one funnel stage does not degrade the overall system, \textit{Guardrail Metrics} are enforced as absolute constraints. These include \textit{Page Load Latency} (to monitor the performance impact of high-fidelity media) and \textit{Checkout Success Rate}. Any statistically significant regression in these indicators triggers an immediate review or termination of the experiment to protect the core user experience.
+\end{itemize}
+
+To ensure the experiment is sufficiently powered to detect meaningful changes while controlling for false positives, a rigorous sample size calculation is performed. Given that the ATC Rate is a binary proportion, the methodology utilizes a \textit{two-proportion Z-test} for power analysis.
+
+The required sample size ($n$) per variant is calculated using the following objective function:
+\begin{equation}
+n = \frac{(Z_{\alpha/2} + Z_{\beta})^2 \times [p_1(1-p_1) + p_2(1-p_2)]}{(p_2 - p_1)^2}
+\end{equation}
+
+Where the technical parameters are defined as:
+\begin{itemize}
+    \item $p_1$: The baseline ATC rate, established from a 168-day historical feature window.
+    \item $p_2$: The target conversion rate, calculated as $p_1 \times (1 + MDE)$, where $MDE$ (Minimum Detectable Effect) is the smallest uplift that justifies the implementation cost.
+    \item $Z_{\alpha/2}$: The critical value for the significance level ($\alpha = 0.05$), set at 1.96 to control the probability of Type I errors (False Positives).
+    \item $Z_{\beta}$: The value for the desired statistical power ($1-\beta = 0.80$), set at 0.84 to ensure an 80\% probability of detecting a true effect.
+\end{itemize}
+
+The duration of the experiment ($D$) is not determined solely by the sample size, but also by temporal constraints to account for periodic behavioral fluctuations. The minimum duration is derived as $D = n / \textit{daily\_traffic}$. 
+
+To mitigate the \textit{Day-of-Week Effect}—the phenomenon where user behavior varies significantly between weekdays and weekends—the testing period is strictly enforced as a multiple of 7 days (e.g., 14, 21, or 28 days). This ensures that the experiment captures a complete business cycle, thereby neutralizing time-based noise and increasing the reliability of the findings. \\
+Beyond statistical significance, the campaign must demonstrate business viability. The framework incorporates a financial model to estimate the potential Return on Marketing Investment (ROMI) before full-scale deployment.
+
+The \textit{Incremental Profit} is modeled by estimating the downstream impact of the ATC rate uplift on finalized transactions:
+\begin{equation}
+\begin{aligned}
+\textit{Incremental Profit} ={}& \Delta \textit{ATC Rate} \times \textit{Sessions} \\
+& \times \textit{Purchase Rate} \times \textit{AOV} \\
+& \times \textit{Gross Margin} - \textit{Project Cost}
+\end{aligned}
+\end{equation}
+
+The ultimate campaign efficiency is evaluated through the ROMI metric, which weighs the generated incremental profit against the total project expenditure:
+\begin{equation}
+\textit{ROMI} = \frac{\textit{Incremental Profit}}{\textit{Project Cost}}
+\end{equation}
+
+This technical approach ensures that marketing decisions are driven by both statistical rigor and financial accountability, prioritizing campaigns that offer the highest probability of positive economic impact.
+
+\subsubsection{Segment-Level Campaign Profitability Optimization}
+
+Building on the funnel experiment and historical segmentation outputs, an additional decision-optimization layer is introduced to determine which customer segments should receive marketing investment before any campaign is scaled. The objective of this module is not only to rank segments by predicted purchase probability, but also to evaluate whether the expected economic return of targeting each segment exceeds its acquisition and campaign cost. This creates a bridge between predictive modeling and managerial budget allocation.
+
+The input to this stage is the final customer segmentation table, where each user is associated with a final cluster name, buyer flag, historical revenue, transaction count, and model-based purchase probability. When the machine-learning prediction score is unavailable, the framework assigns segment-specific simulated probabilities based on behavioral intent. High-Value buyers receive the highest expected probability, followed by Recent buyers, Hot Prospects, Warm Prospects, Dormant users, and low-intent groups. This fallback procedure allows the decision framework to remain operational even when production scoring is incomplete, while still preserving the behavioral hierarchy identified in segmentation.
+
+Because Google Analytics revenue may appear either in standard currency or micro-unit format, the pipeline first validates the revenue scale by calculating the median customer-level average order value among purchasing users. If the median value is unrealistically large, revenue is converted from micro-units by dividing by $10^{6}$. Segment-level summaries are then constructed by aggregating total revenue, total transactions, average predicted purchase probability, and segment size. The observed average order value is calculated as
+
+\begin{equation}
+AOV_s = \frac{\textit{Revenue}_s}{\textit{Transactions}_s},
+\end{equation}
+
+where $s$ denotes a customer segment. For non-buyer segments with no observed transaction history, expected AOV is imputed as a proportion of the buyer benchmark AOV. Hot Prospects are assigned 95\% of buyer AOV, Warm Prospects 80\%, Dormant users 75\%, and lower-intent groups 55\%. This imputation reflects the assumption that higher-intent non-buyers are closer to buyer-like value than broad low-intent visitors.
+
+The framework then assigns segment-specific unit-economics parameters. Gross margin and customer acquisition cost are varied by segment to reflect different campaign costs and expected profitability. For example, High-Value customers are assigned relatively high margin and low acquisition cost, while General and Low-Intent users receive lower margins and higher CAC assumptions. To account for operational uncertainty, CAC is simulated stochastically as
+
+\begin{equation}
+CAC_s^{sim} \sim \mathcal{N}(CAC_s, (0.15 \times CAC_s)^2),
+\end{equation}
+
+with simulated values clipped at a minimum of one dollar. This converts the decision model from a deterministic ranking exercise into a more realistic profitability simulation.
+
+For each segment, the minimum break-even conversion rate is calculated as
+
+\begin{equation}
+CR_{min,s}=\frac{CAC_s^{sim}}{AOV_s \times GM_s},
+\end{equation}
+
+where $GM_s$ is the segment-specific gross margin. Expected campaign profit is then estimated as
+
+\begin{equation}
+\textit{Profit}_s = N_s \times CR_s \times AOV_s \times GM_s - \textit{Spend}_s,
+\end{equation}
+
+where $N_s$ is segment size, $CR_s$ is the model-implied purchase probability, and $\textit{Spend}_s=N_s \times CAC_s^{sim}$. Campaign efficiency is measured through ROMI:
+
+\begin{equation}
+ROMI_s = \frac{\textit{Profit}_s}{\textit{Spend}_s}.
+\end{equation}
+
+The final prioritization rule combines statistical propensity with economic feasibility. A segment is classified as \textit{Scale Aggressively} when ROMI is greater than one and the predicted conversion rate exceeds the break-even threshold. It is classified as \textit{Scale Carefully} when ROMI is positive and conversion probability remains above break-even. Otherwise, the segment is labeled \textit{Do Not Scale}. This rule prevents the business from investing in segments that appear behaviorally promising but fail to satisfy unit-economic constraints.
+
+The same framework also supports break-even sensitivity analysis. For each segment, the required conversion rate is recalculated across a grid of gross margin assumptions (20\%, 30\%, 40\%, and 50\%) and CAC levels (\$5, \$10, \$15, and \$20). This pivot analysis identifies the economic conditions under which a campaign becomes viable and helps managers understand whether profitability depends more strongly on margin improvement, CAC reduction, or conversion uplift.
+
+
+This optimization layer ensures that campaign recommendations are not based solely on descriptive segmentation or predictive scores. Instead, each segment is evaluated through a combined framework of purchase probability, expected AOV, gross margin, stochastic CAC, break-even conversion rate, and ROMI. The resulting decision rule provides a financial screening mechanism that helps prioritize segments with both behavioral potential and positive expected economic return.
+
+\subsubsection{Predictive Segment Campaign Strategy}
+
+The predictive segmentation phase partitions the active user 
+base of 119,207 sessions into two clusters via K-Means, 
+yielding a High-Value \text{Stars} segment (2,462 users, 
+avg $p\_buy$ = 0.040) and a \text{Low Priority} segment 
+(116,745 users, avg $p\_buy$ = 0.001), as summarized in 
+Table~\ref{tab:kmeans_profile}. Given this disparity, campaign 
+resources are distributed selectively rather than uniformly 
+across the user base. The Stars segment is therefore 
+designated as the primary campaign target, with the objective 
+framed as conversion acceleration -- encouraging 
+high-intent users to complete purchases through personalized 
+engagement. The treatment design adopts a multi-layered 
+approach aimed at reducing conversion friction and 
+strengthening purchase intent:
+
+\begin{itemize}
+    \item Personalized Re-engagement Campaigns:
+    Behavioral-triggered email or push notification campaigns
+    leveraging recency, browsing depth, and product affinity
+    signals to deliver contextually relevant reminders and
+    offers.
+
+    \item Exclusive Incentive Offers:
+    Time-sensitive promotional incentives such as discounts,
+    free-shipping offers, or loyalty rewards designed to
+    reduce hesitation among high-intent users.
+
+    \item Retargeting and Recommendation Strategies:
+    Personalized recommendation systems and remarketing
+    touchpoints aimed at re-engaging users who demonstrated
+    strong browsing or cart activity but did not finalize
+    checkout.
+\end{itemize}
+
+In contrast, the \text{Low Priority} segment is approached 
+through low-cost awareness-oriented strategies. Given its 
+substantially weaker purchase likelihood, high hibernation 
+rate, and lower expected revenue contribution, aggressive 
+conversion-focused spending on this group is unlikely to 
+generate positive returns. The framework therefore prioritizes 
+organic content, broad SEO, and seasonal touchpoints for this 
+population, reserving performance marketing budget exclusively 
+for the Stars segment.
+
+The primary performance metric is the \text{Conversion Rate 
+(CR)}, defined as the proportion of targeted users who 
+complete a purchase following campaign exposure:
+
+\begin{equation}
+CR = \frac{\text{Number of purchasers post-exposure}}
+          {\text{Total users targeted}}
+\end{equation}
+
+Campaign viability is evaluated by modeling expected 
+profitability as:
+\begin{equation}
+\textit{Expected Profit} = \textit{Total\_Rev} \times CR 
+\times GM - N \times CAC
+\end{equation}
+
+\noindent where $\textit{Total\_Rev}$ denotes the aggregate 
+predicted revenue of the targeted segment (\$5,964 for 
+Stars), $GM$ represents gross margin, $N$ is the number of 
+targeted users (2,462), and $CAC$ is the cost per targeted 
+user. Campaign efficiency is further quantified through the 
+Return on Investment metric:
+
+\begin{equation}
+ROI = \frac{\textit{Expected Profit}}{N \times CAC}
+\end{equation}
+
+To assess robustness under varying business assumptions, 
+the framework incorporates a sensitivity analysis across 
+CAC, gross margin, and conversion rate scenarios. The 
+minimum conversion threshold required for campaign 
+profitability is defined as:
+
+\begin{equation}
+CR_{\text{break-even}} = \frac{N \times CAC}
+{\textit{Total\_Rev} \times GM}
+\end{equation}
+
+Finally, campaign effectiveness is validated through a 
+randomized A/B testing framework using the Stars segment 
+as the primary experimental population. The detailed 
+experimental protocol -- including treatment-control 
+design, sample size estimation, statistical significance 
+thresholds, and temporal controls for mitigating 
+day-of-week effects -- is established in 
+Section~\ref{sec:funnel_strategy_highest_dropoff}. The 
+objective is to estimate the incremental conversion uplift 
+generated by the campaign while ensuring both statistical 
+validity and financial feasibility prior to full-scale 
+deployment.
+
+\section{Results and Discussion}
 
 %--------------------------------------------------
-\section{Modeling}
 
-\subsection{Feature Engineering}
-After completing the exploratory analysis stage, the next objective was to transform raw session-level clickstream data into customer-level behavioral representations suitable for downstream machine learning models. Since the Google Analytics dataset is highly sparse and dominated by short non-converting sessions, the feature engineering pipeline focused on aggregating historical user behavior across time windows rather than modeling isolated sessions independently.
 
-To avoid temporal leakage, all features were generated inside rolling time folds consisting of a historical feature window and a future target window. For each fold, customer behavioral features were constructed exclusively from past sessions before predicting future revenue activity.
+\subsection{Business Performance Overview}
 
-\subsubsection{Categorical Standardization and Target Encoding}
+The business performance dashboard in Fig.~\ref{fig:business_overview} provides a high-level view of revenue, user activity, transaction volume, acquisition channels, and retention indicators. Overall, the company generated approximately 2 million in total revenue, supported by around 1 million users, 19 thousand transactions, and 2 million sessions. These figures indicate that the business has achieved a relatively large traffic and user base. However, the churn rate of 82.76\% reveals a major retention issue. Although the company is able to attract users, it appears less effective in sustaining long-term engagement and encouraging repeated purchasing behavior.
 
-Several categorical variables extracted from the nested JSON structures contained extremely high cardinality, including geographic attributes, traffic acquisition sources, browser information, and campaign identifiers.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.A.overview.jpg}
+    \caption{Business performance overview dashboard.}
+    \label{fig:business_overview}
+\end{figure}
 
-Instead of applying direct one-hot encoding, the pipeline first performed Top-$N$ grouping using only categories observed frequently in the training sessions. Rare categories were grouped into a common \texttt{Other} class in order to reduce sparsity and stabilize feature distributions across folds.
+The revenue trend shows considerable fluctuation over time, followed by a noticeable decline after August 2017. Before this period, revenue reached several peaks, particularly between late 2016 and mid-2017. After August 2017, revenue decreased and remained at a lower level. This decline does not appear to be fully explained by a proportional drop in sessions, suggesting that the main issue may not be traffic generation but rather the ability to convert visitors into transactions and revenue.
 
-The standardized categorical variables included:
+From a marketing-driven data perspective, this pattern indicates a potential conversion-efficiency problem. The company continues to attract users, but the commercial value extracted from this traffic remains limited. Possible causes include weak landing-page relevance, ineffective promotional messages, pricing concerns, friction in the purchasing journey, or reduced campaign effectiveness after mid-2017. Therefore, further funnel analysis is needed to identify where users drop off, such as during product browsing, cart addition, checkout, or post-visit re-engagement.
+
+Channel-level analysis shows that Referral is the strongest-performing acquisition channel, contributing the highest revenue and the largest number of transactions. This suggests that referral traffic is not only sizeable but also commercially valuable. Users from referral sources may have higher trust, stronger purchase intention, or greater relevance to the company's offerings. In contrast, Paid Search and Display contribute relatively little revenue and transaction volume, suggesting that these channels may attract lower-intent users or require further optimization.
+
+The key implication is that marketing performance should not be evaluated based only on traffic volume. Instead, each channel should be assessed according to its contribution to revenue, transactions, and long-term customer value. Referral should be prioritized and expanded through referral programs, affiliate partnerships, partnership marketing, or customer advocacy initiatives. Meanwhile, Paid Search and Display should be reviewed in terms of targeting accuracy, creative quality, keyword strategy, landing-page alignment, and return on advertising spend.
+
+The user-type distribution further highlights the company's retention challenge. New users account for 86.04\%, while returning users represent only 13.96\%. This indicates a heavy dependence on new-user acquisition and a weak returning-user base. When combined with the high churn rate, this finding suggests that the company has not yet developed strong mechanisms to bring users back after their first visit or purchase.
+
+Overall, the dashboard suggests that the company has a strong traffic foundation but faces clear challenges in revenue stability, conversion efficiency, and customer retention. For the CMO, the strategic priority should shift from purely acquisition-led growth toward a more balanced approach that emphasizes traffic quality, conversion optimization, customer relationship management, remarketing, loyalty incentives, and personalized post-purchase engagement.
+
+\subsection{Customer Analysis}
+
+This subsection evaluates customer behavior from three complementary perspectives: session quality, funnel drop-off, and cohort retention. Together, these analyses describe how effectively the website transforms acquired traffic into engaged users, purchasing customers, and returning visitors.
+
+\subsubsection{Session Quality and Traffic Insights}
+
+The session-quality dashboard in Fig.~\ref{fig:session_quality} indicates that the website is able to attract substantial traffic, but the conversion value extracted from this traffic remains limited. The bounce rate reaches 52.32\%, implying that more than half of all sessions terminate after the first interaction. In an e-commerce setting, this pattern suggests a mismatch between traffic acquisition and purchase intent: many visitors may be informational users who search, compare, or browse without immediate buying motivation. It may also indicate that landing pages do not communicate sufficient value quickly enough, or that early user experience frictions such as loading speed, layout, and device responsiveness discourage further exploration.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.B.session.jpg}
+    \caption{Session quality and traffic insights.}
+    \label{fig:session_quality}
+\end{figure}
+
+For users who do not bounce, engagement is meaningfully stronger. The average session records 3.79 pageviews, 4.54 hits, and 123.86 seconds on site. This suggests the coexistence of two behavioral groups: low-engagement visitors who leave almost immediately and more exploratory users who view multiple pages, interact with products, and spend more time on the platform. The visualization also shows that transaction volume increases substantially with the number of hits per session. In particular, sessions with 21--50 hits contribute the largest number of transactions despite representing a smaller share of total traffic. This confirms that engagement depth is a central intermediary between traffic acquisition and conversion.
+
+Traffic-source patterns further show that Organic Search contributes the largest share of visits, reflecting effective search visibility. However, when interpreted together with funnel and retention results, Organic Search appears weaker in conversion quality than Referral traffic. This implies that SEO currently expands reach but often attracts users in awareness or comparison stages rather than purchase-ready users. Device and geographic patterns also reveal heterogeneous traffic quality. Desktop accounts for the majority of sessions and appears to provide the most effective browsing environment, while mobile and tablet users show weaker downstream performance, suggesting potential UX frictions. Geographically, the United States is the dominant market in traffic and revenue, but smaller regions such as Oceania and Africa show stronger retention signals, indicating that traffic volume does not necessarily equal customer quality.
+
+\subsubsection{Funnel and Drop-off Analysis}
+
+The funnel dashboard in Fig.~\ref{fig:funnel_analysis} shows substantial user loss throughout the conversion journey. Although total funnel sessions reach approximately two million visits, the final conversion rate is only 1.22\%, indicating that most visitors do not complete a purchase. The lowest drop-off occurs from Click to Product View, at approximately 2.03\%, suggesting that the website is relatively effective at directing users toward product pages. Therefore, product discovery and initial navigation are not the primary bottlenecks.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.B.funnel.jpg}
+    \caption{Funnel conversion and drop-off analysis.}
+    \label{fig:funnel_analysis}
+\end{figure}
+
+The critical bottleneck occurs between Product View and Add to Cart, where the drop-off rate reaches 63.65\%. This indicates that users demonstrate product interest but are not sufficiently persuaded to commit to a stronger purchase action. From a behavioral perspective, this stage reflects perceived risk or insufficient perceived value. Possible causes include weak product differentiation, limited trust signals, insufficient urgency, unclear shipping or pricing information, low-quality product images, incomplete descriptions, or checkout-related friction. The decline from roughly 244 thousand Product Views to 89 thousand Add-to-Cart actions shows that the website loses many high-potential users at the consideration stage.
+
+Channel-level funnel performance reinforces the distinction between traffic quantity and quality. Referral traffic achieves the highest conversion rate, suggesting that users arriving through review sites, affiliates, influencers, or partner ecosystems bring stronger prior trust and clearer purchase expectations. By contrast, Organic Search generates large traffic volume but higher late-stage drop-off, consistent with a larger share of research-oriented users. Tablet sessions exhibit the highest Product-to-Cart drop-off across several channels, further suggesting that device-specific UX friction affects purchase progression.
+
+\subsubsection{Cohort and Retention Analysis}
+
+The cohort dashboard in Fig.~\ref{fig:cohort_analysis} indicates that user retention is weak. The returning-user rate is only 13.96\%, while the 30-day retention rate is 2.61\%. Average lifetime reaches 3.22 days, implying that most users interact with the website briefly and do not develop a sustained relationship with the platform. The retention heatmap shows that cohorts decline rapidly after the first month and approach near-zero retention after several months.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.B.cohort.jpg}
+    \caption{Cohort and retention analysis.}
+    \label{fig:cohort_analysis}
+\end{figure}
+
+An important finding is that high-revenue cohorts do not necessarily achieve stronger retention. This suggests that the current growth model relies more on short-term revenue extraction than on sustainable customer relationship development. Referral again appears to be the strongest retention channel, followed by Paid Search, whereas Organic Search shows lower retention despite its large traffic volume. This confirms that customer quality varies substantially across acquisition sources. Similarly, Oceania and Africa show stronger retention despite smaller traffic volume, suggesting that niche markets may contain users with stronger product fit or lower competitive alternatives.
+
+Overall, the session, funnel, and cohort analyses suggest that the website operates primarily under an acquisition-driven growth model. Traffic generation is not the main limitation; the key challenge is transforming visits into deeper engagement, purchase actions, and repeat relationships. The findings imply that the business should shift emphasis from maximizing session volume toward improving landing-page relevance, strengthening product-page persuasion, optimizing mobile and tablet UX, and developing post-visit retention mechanisms such as remarketing, loyalty programs, personalized recommendations, and post-purchase engagement.
+
+
+\subsection{Customer Segmentation}
+\subsubsection{Customer Segmentation Results and Actionable Strategies}
+
+The historical segmentation phase successfully decomposed the user base into distinct behavioral cohorts by leveraging a base-aware scoring system (1--5 scale). This approach allows for a precise evaluation of user quality, where a score of 5 represents the top 20\% of performers in a specific metric, and a score of 1 indicates baseline or sub-baseline performance. By analyzing the interaction between these scores across Recency (R), Frequency (F), Monetary (M), Engagement (E), and Funnel Depth, the following results and strategic roadmaps were established.
+
+
+\paragraph{Buyer Segment}
+
+The buyer population is partitioned into three clusters, demonstrating a strong Pareto distribution where a minority of customers generates the majority of revenue.
 
 \begin{itemize}
-    \item \textit{geoNetwork\_city}
-    \item \textit{geoNetwork\_country}
-    \item \textit{geoNetwork\_region}
-    \item \textit{geoNetwork\_metro}
-    \item \textit{geoNetwork\_subContinent}
-    \item \textit{trafficSource\_source}
-    \item \textit{trafficSource\_campaign}
-    \item \textit{trafficSource\_medium}
-    \item \textit{channelGrouping}
-    \item \textit{device\_browser}
-    \item \textit{device\_operatingSystem}
-    \item \textit{device\_deviceCategory}
+    \item Cluster 0: High-Value Engaged Buyers (35.10\% Population, 61.33\% Revenue) \\
+    Profile: This elite segment achieves robust scores in Frequency (4), Monetary (4), Loyalty (4), and Engagement (4). Although their Recency score is moderate (3), their historical contribution is paramount. \\
+    Strategy: The primary objective is \textit{Retention and Value Maximization}. Strategies focus on loyalty benefits, early access to new collections, and premium services. To increase Customer Lifetime Value (CLV), the business should employ cross-selling and upselling tactics through bundled offers. Large-scale general discounting should be avoided to preserve margin from this high-affinity group. \\
+    Key KPIs: Revenue retention, repeat purchase rate, and Average Order Value (AOV).
+
+    \item Cluster 1: At-Risk Low-Activity Buyers (37.23\% Population, 22.95\% Revenue) \\
+    Profile: Despite being the largest buyer group, their revenue contribution is disproportionately low. They exhibit poor scores in Recency (2), Frequency (2), and Loyalty (1), combined with a high Bounce score (5). However, a high Funnel score (4) suggests they still browse deeply when they visit. \\
+    Strategy: Focus is placed on \textit{Win-back and Reactivation}. Campaigns should utilize low-cost remarketing and automated email triggers for product reminders. Marketing spend (CAC) must be strictly controlled, and deep discounts should only be offered upon signals of re-engagement. \\
+    Key KPIs: Reactivation rate, return visit rate, and cost per reactivated buyer.
+
+    \item Cluster 2: Recent Quality Buyers (27.67\% Population, 15.72\% Revenue) \\
+    Profile: This group represents the "new blood" of the customer base with a high Recency score (4) and strong Session Quality (4). While their Frequency (2) and Loyalty (1) are currently low, their high Funnel score (4) indicates a strong potential to become loyalists. \\
+    Strategy: The focus is on \textit{Post-purchase Onboarding}. Tactics include second-purchase incentives, personalized recommendations, and follow-up engagement. It is critical to avoid classifying them as fully loyal too early; instead, nurture them to increase their purchase frequency. \\
+    Key KPIs: Second purchase rate, time to next purchase, and recommendation conversion.
 \end{itemize}
 
-After grouping, target encoding was applied at the session level using the historical mean transaction revenue learned from training sessions only. This approach preserves behavioral information while avoiding the dimensional explosion caused by sparse categorical encoding.
+\paragraph{Non-Buyer Segment}
 
-\subsubsection{Customer-Level Aggregation Features}
-
-Following categorical preprocessing, session-level interactions were aggregated using the \textit{fullVisitorId} identifier to construct long-term behavioral summaries for each customer.
-
-Multiple aggregation operators including \texttt{sum}, \texttt{mean}, \texttt{max}, and \texttt{count} were applied to engagement and transaction variables such as:
+The non-converting audience is segmented into five clusters based on their proximity to the conversion threshold and interaction depth.
 
 \begin{itemize}
-    \item \textit{totals\_hits}
-    \item \textit{totals\_pageviews}
-    \item \textit{totals\_timeOnSite}
-    \item \textit{visitNumber}
-    \item \textit{totals\_transactions}
-    \item \textit{totals\_transactionRevenue}
+    \item Cluster 3: Hot Prospects (4.86\% Share) \\
+    Profile: This is the highest-intent segment with maximum scores in Engagement (5), Bounce (5 - low bounce), Session Quality (5), and Funnel depth (5). They are highly active and deeply integrated into the site's navigation. \\
+    Strategy: \textit{Prioritized Retargeting}. Implement aggressive Call-to-Action (CTA) triggers, first-purchase incentives, and abandoned journey reminders to push them through the final purchase threshold.
+    
+    \item Cluster 4: Warm Prospects (6.65\% Share) \\
+    Profile: These users are very recent (R=5) and engaged (E=4), but their Session Quality is currently low (2). They browse deeply (Funnel=4) but lack the intense interaction quality seen in Hot Prospects. \\
+    Strategy: \textit{Education and Persuasion}. Use product education guides, comparison charts, and light retargeting to capture their email addresses and build trust before offering a first-purchase incentive.
+
+    \item Cluster 0: New Low-Intent Visitors (6.23\% Share) \\
+    Profile: Very recent visitors (R=5) who show minimal engagement (E=1) and funnel movement (Fn=1). \\
+    Strategy: \textit{Awareness and Navigation}. Focus on homepage personalization, newsletter capture, and low-cost content recommendations to stimulate initial curiosity without over-investing in expensive retargeting.
+
+    \item Cluster 1: Dormant Engaged Non-Buyers (36.60\% Share) \\
+    Profile: Users who are no longer recent (R=2) but had high historical Engagement (4) and Funnel scores (3). They represent a "lost" interest that can be revived. \\
+    Strategy: \textit{Re-engagement}. Deploy win-back campaigns, category reminders, and limited-time return offers to address the barriers that prevented their initial conversion.
+
+    \item Cluster 2: General Non-Buyers (45.67\% Share) \\
+    Profile: The largest but least valuable segment, scoring low across all intent signals (R=3, E=1, Fn=1, SQ=1). \\
+    Strategy: \textit{General Nurturing}. Rely on organic SEO, seasonal content, and low-cost broad awareness. This group should be suppressed from expensive paid retargeting channels to optimize budget for Hot and Warm Prospects.
+
 \end{itemize}
 
-This aggregation process generated behavioral indicators representing cumulative engagement intensity, browsing consistency, and historical transaction activity across multiple sessions.
 
-\subsubsection{RFM and Customer Lifetime Features}
+Customer segmentation was conducted to identify behavioral and value-based differences across users. The analysis separates customers into buyers and non-buyers, reflecting different stages of the customer journey. This distinction is important because each group requires different marketing actions. For buyers, the objective is to increase retention, repeat purchase, and customer lifetime value. For non-buyers, the objective is to identify purchase intent, nurture interest, and convert potential customers into actual buyers.
 
-To capture long-term purchasing behavior, the framework additionally constructed Recency-Frequency-Monetary (RFM)-style features.
+\subsubsection{Buyer Segmentation Result}
 
-Recency variables measured the temporal distance between customer visits, while frequency indicators captured repeated interaction activity across the feature window. Monetary behavior was represented through aggregated historical revenue statistics such as total, average, and maximum transaction revenue.
+The buyer segmentation dashboard in Fig.~\ref{fig:buyer_segmentation} reports approximately 14 thousand buyers, with an average recency score of 322.5, an average frequency of 3.73, and a repeat buyer rate of only 9.55\%. These results indicate that although the company has acquired a meaningful buyer base, repeat purchasing remains limited. The low repeat buyer rate suggests that the company is not fully exploiting the value of existing customers and may have an underdeveloped retention strategy.
 
-Beyond standard RFM metrics, probabilistic customer lifetime features were generated using the BG/NBD and Gamma-Gamma models from the \texttt{lifetimes} library. These models produced forward-looking behavioral estimates including:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.C.buyer.jpg}
+    \caption{Buyer segmentation dashboard.}
+    \label{fig:buyer_segmentation}
+\end{figure}
 
-\begin{itemize}
-    \item probability of customer survival (\textit{p\_alive}),
-    \item expected future purchases (\textit{expected\_purchases\_62d}),
-    \item expected average monetary value (\textit{expected\_monetary}).
-\end{itemize}
+The buyer base is divided into three main segments: At-Risk Low-Activity Buyers, High-Value Engaged Buyers, and Recent Quality Buyers. At-Risk Low-Activity Buyers represent the largest share, accounting for approximately 37.23\% of buyers. High-Value Engaged Buyers account for about 35.10\%, while Recent Quality Buyers represent 27.67\%. The fact that the largest segment is classified as at-risk is strategically important, as it suggests that a substantial proportion of existing buyers may become inactive if no corrective action is taken.
 
-These features provide a probabilistic representation of future customer value rather than relying solely on historical summaries.
+Among the three groups, High-Value Engaged Buyers are the most commercially valuable segment. They have the highest monetary value, approximately 67.185 million, compared with 41.48 million for At-Risk Low-Activity Buyers and 39.98 million for Recent Quality Buyers. This group also has the highest customer length, indicating a longer relationship with the business. Therefore, High-Value Engaged Buyers should be treated as a strategic priority. The company should protect and develop this group through loyalty programs, VIP benefits, early access to promotions, personalized recommendations, and cross-sell or upsell campaigns.
 
-\subsubsection{Session Velocity and Behavioral Intensity}
+In contrast, At-Risk Low-Activity Buyers represent the largest and most vulnerable buyer group. Their recency score is the highest, at approximately 483, meaning they have not purchased for a long period. Their frequency score is also low, around 1.03, indicating weak repeat purchasing behavior. This segment also shows the highest churn tendency. Although these customers have previously generated revenue, their current inactivity suggests that they are moving away from the brand. Targeted win-back campaigns are therefore necessary. These campaigns should use past purchase behavior, personalized offers, urgency-based incentives, and reactivation messages rather than generic promotions.
 
-The pipeline also engineered velocity-based behavioral indicators to capture interaction intensity within browsing sessions.
+The third segment, Recent Quality Buyers, has the lowest recency score, around 151, meaning these customers purchased more recently than the other groups. However, their frequency remains low at approximately 1.03, indicating that they have not yet developed repeat purchase behavior. This group represents a future growth opportunity. Since they have purchased recently, the company should encourage a second purchase through onboarding emails, personalized follow-up messages, complementary product recommendations, and next-purchase incentives.
 
-The constructed variables included:
+Overall, buyer segmentation shows that the company should not treat all buyers as a single homogeneous group. High-Value Engaged Buyers should be retained and rewarded, At-Risk Low-Activity Buyers should be reactivated, and Recent Quality Buyers should be nurtured toward repeat purchasing. This provides a practical foundation for lifecycle marketing and enables the CMO to allocate resources according to customer value, risk level, and future growth potential.
 
-\begin{itemize}
-    \item \textit{vel\_pageviews}
-    \item \textit{vel\_hits}
-    \item \textit{vel\_sessions}
-    \item \textit{funnel\_depth}
-\end{itemize}
+\subsubsection{Non-Buyer Segmentation Result}
 
-These variables describe how actively customers interact with the platform over time. High-conversion users were frequently associated with deeper funnel traversal and more concentrated browsing activity compared to short exploratory sessions.
+The non-buyer segmentation dashboard in Fig.~\ref{fig:nonbuyer_segmentation} reports approximately 1 million non-buyers, with an average engagement score of 4.71, average total hits of 3.57, and a bounce rate of 54.53\%. These figures indicate that many users visit the platform without completing a purchase, and more than half leave with limited interaction. However, the segmentation results show that non-buyers are not uniform. Some have weak purchase intent, while others show strong behavioral signals that suggest a higher probability of conversion.
 
-\subsubsection{Temporal Behavioral Features}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.C.nonbuyer.jpg}
+    \caption{Non-buyer segmentation dashboard.}
+    \label{fig:nonbuyer_segmentation}
+\end{figure}
 
-Additional temporal features were extracted to capture cyclical user activity patterns.
+The non-buyer base is divided into five segments: General Non-Buyers, Dormant Engaged Non-Buyers, Warm Prospects, New Low-Intent Visitors, and Hot Prospects. General Non-Buyers form the largest segment, accounting for approximately 45.67\% of non-buyers. Dormant Engaged Non-Buyers represent the second largest group at 36.60\%. The remaining groups are smaller: Warm Prospects account for 6.65\%, New Low-Intent Visitors for 6.23\%, and Hot Prospects for 4.86\%. This distribution suggests that most non-buyers have either low or unclear purchase intent, meaning that a broad remarketing strategy targeting all non-buyers would likely be inefficient.
 
-The engineered variables included:
+Among all non-buyer groups, Hot Prospects show the strongest buying signals. Although they represent only 4.86\% of non-buyers, they have the highest engagement indicators, including approximately 12 pageviews, 14 hits, 321 seconds of time on site, and a session quality score of 4.0. These behaviors indicate that Hot Prospects are actively exploring the platform and may be close to making a purchase. Therefore, this group should be prioritized for conversion-focused campaigns such as dynamic remarketing, personalized product recommendations, abandoned-session reminders, limited-time offers, or free shipping incentives.
 
-\begin{itemize}
-    \item \textit{pct\_weekend}
-    \item \textit{pct\_evening}
-    \item \textit{recency\_days}
-    \item \textit{lifetime\_days}
-\end{itemize}
+Warm Prospects show moderate interest, with around 4 pageviews, 5 hits, and 81 seconds of time on site. Their engagement is lower than Hot Prospects but stronger than low-intent groups. This suggests that they may still be in the consideration stage and require additional trust-building before purchase. Suitable strategies include customer reviews, product comparison content, social proof, educational messages, and moderate incentives.
 
-These features represent customer browsing preferences across different time periods and allow the model to learn temporal variations in purchasing behavior.
+Dormant Engaged Non-Buyers represent a large group that previously showed engagement but now has a long inactivity gap. This indicates that the company once attracted their interest but failed to convert them before they became inactive. Marketing efforts for this group should focus on reactivation rather than immediate selling. Appropriate actions include ``continue where you left off'' messages, reminders based on previously viewed products, return incentives, personalized emails, and short surveys to understand why they did not purchase.
 
-% \subsubsection{Feature Stabilization and Outlier Handling}
+By contrast, General Non-Buyers and New Low-Intent Visitors show weak engagement and high bounce behavior. General Non-Buyers, despite being the largest segment, show only around 1 pageview, 1 hit, and very limited time on site. This suggests that these users may not be well matched to the company's offerings or may have arrived through low-quality acquisition sources. Therefore, these groups should not be prioritized for aggressive conversion campaigns. Instead, the company should improve traffic quality, audience targeting, creative messaging, and landing-page relevance to reduce bounce and increase initial engagement.
 
-% Finally, the engineered numerical features were stabilized using clipping and transformation procedures.
+Overall, non-buyer segmentation shows that conversion potential is concentrated in specific high-intent groups rather than evenly distributed across the entire non-buyer base. Hot Prospects should be prioritized for immediate conversion, Warm Prospects should be nurtured, Dormant Engaged Non-Buyers should be reactivated, and low-intent users should be addressed through acquisition and landing-page optimization.
 
-% Because engagement and monetary variables exhibited extreme heavy-tailed distributions, several features were clipped at the 99th percentile using thresholds calculated exclusively from training folds. The clipping process was applied to engagement variables, transaction statistics, velocity indicators, and monetary features such as \textit{expected\_monetary}.
+\subsection{Model Performance Analysis (CLV)}
 
-% This step reduced outlier dominance while preserving the relative ordering of high-value customers, resulting in a more stable feature space for the downstream two-stage XGBoost framework.
+The CLV dashboard in Fig.~\ref{fig:clv_analysis} shows a highly uneven distribution of predicted customer value. The modeled customer base contains approximately 119,207 users, yet the \textit{Stars} segment represents only 2.07\% of users. Despite its small size, this group contributes a disproportionately large share of expected revenue. This pattern is consistent with the Pareto principle in customer analytics, where a small number of high-value customers accounts for the majority of long-term business value.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/IV.D.clv.jpg}
+    \caption{Customer lifetime value prediction and segmentation.}
+    \label{fig:clv_analysis}
+\end{figure}
+
+The comparison of segment size and expected revenue demonstrates that the Low Priority segment contains most users but contributes limited expected value. In contrast, the Stars segment is small but commercially critical. This result implies that allocating marketing resources uniformly across all users would be inefficient; instead, resource allocation should account for predicted value, purchase probability, and customer activity status.
+
+The relationship between \textit{p\_buy} and expected revenue is positive, indicating that customers with higher purchase probability also tend to generate higher predicted value. Purchase probability therefore functions not only as a short-term conversion signal but also as an indicator of longer-term customer profitability. Returning customers further demonstrate substantially higher expected revenue, stronger purchase probability, and more stable behavioral patterns than new customers. This confirms that repeat visitation is one of the strongest signals of customer quality.
+
+The CLV component analysis provides additional interpretation. Stars customers exhibit higher \textit{p\_alive}, higher \textit{p\_buy}, greater expected monetary value, and lower recency than Low Priority customers. Lower recency means that these customers interacted with the website more recently, which usually indicates a higher probability of future purchase. Conversely, Low Priority customers display high recency values, suggesting inactivity and elevated churn risk. Stars customers are therefore valuable not only because they purchase more frequently, but also because they generate greater monetary value per transaction.
+
+These findings indicate that the company should transition from an acquisition-centric strategy to a customer lifetime value optimization strategy. The business should prioritize high-potential users, loyal customers, high-frequency buyers, and segments with high predicted purchase probability. Personalized experiences, loyalty ecosystems, targeted remarketing, and post-purchase engagement are therefore essential mechanisms for maximizing long-term customer profitability.
+
+
+\subsection{Strategy and Experimental Design}
+\subsubsection{Funnel Strategy for Highest Drop-off Point}
+
+The funnel-based campaign is designed to address the most critical conversion gap in the customer journey: the transition from \textit{Product View} to \textit{Add to Cart}. This stage is selected because it represents the point where users have already shown product-level interest, but many of them still fail to express stronger purchase intent by adding the product to cart. Therefore, the campaign does not focus on broad traffic acquisition or final checkout optimization. Instead, it targets a narrower and more actionable behavioral problem: converting product viewers into cart adders.
+
+The baseline funnel shows that there are 244,965 product view sessions and 79,263 sessions with both product view and add-to-cart behavior. This gives a baseline Product View to Add-to-Cart rate of 32.36\%. In addition, the downstream Add-to-Cart to Purchase rate is approximately 18.76\%, and the average order value is around \$127.17. These figures provide the foundation for evaluating whether an improvement in the Add-to-Cart rate can generate meaningful downstream business value.
+
+\begin{table}[H]
+\centering
+\caption{Baseline Funnel Metrics for Product View to Add-to-Cart Campaign}
+\label{tab:funnel_baseline_metrics}
+
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+
+\begin{tabular}{|l|r|}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Product View Sessions & 244,965 \\
+Product View + Add to Cart Sessions & 79,263 \\
+Product View + Add to Cart + Purchase Sessions & 14,873 \\
+Product View + Purchase Sessions & 15,344 \\
+Current Product View $\rightarrow$ Add to Cart Rate & 32.36\% \\
+Add to Cart $\rightarrow$ Purchase Rate & 18.76\% \\
+Total Purchase Revenue from Product View Sessions & \$1,951,343.38 \\
+Average Order Value & \$127.17 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The proposed treatment is designed as an optimized product-page experience. The control group receives the current product-view experience, while the treatment group receives a redesigned product-view experience intended to reduce hesitation before adding products to cart. The treatment should focus on three practical design changes. First, the product page should improve visual hierarchy by making the product image, product name, price, and main value proposition easier to scan. Second, the page should increase trust by displaying customer reviews, ratings, delivery information, and return-policy signals more clearly. Third, the page should strengthen action motivation through a more visible Add-to-Cart button, clearer product availability messages, and light urgency cues such as limited-time offers or low-stock indicators.
+
+The final A/B test design uses the Add-to-Cart rate among product viewers as the primary metric. This metric is directly aligned with the campaign objective because the intervention is applied before the cart stage and is expected to influence whether a product viewer moves to the next funnel step. The experiment is therefore defined as follows: users who reach a product-view session are randomly assigned to either the control experience or the optimized product-page treatment, with a 50--50 traffic split. The test should be evaluated using a two-proportion test because the outcome is binary at the session level: a product viewer either adds at least one product to cart or does not.
+
+\begin{table}[H]
+\centering
+\caption{Final A/B Testing Design for Funnel Campaign}
+\label{tab:funnel_ab_final_design}
+
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+
+\begin{tabular}{|l|l|}
+\toprule
+\textbf{Design Component} & \textbf{Final Decision} \\
+\midrule
+Target funnel step & Product View $\rightarrow$ Add to Cart \\
+Eligible traffic & Sessions with product view \\
+Control group & Current product-page experience \\
+Treatment group & Optimized product-page experience \\
+Randomization unit & Session-level product viewers \\
+Traffic allocation & 50\% Control / 50\% Treatment \\
+Primary metric & Product View $\rightarrow$ Add-to-Cart Rate \\
+Baseline rate & 32.36\% \\
+Minimum Detectable Effect & +2.60 percentage points \\
+Target treatment rate & 34.96\% \\
+Test duration & 28 days \\
+Available sample per group & Approximately 5,375 sessions \\
+Statistical power & 80\% \\
+Significance level & 5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The final test duration is set at 28 days rather than a shorter 14-day window. Although a 14-day test is operationally faster, the output shows that it can only detect a relatively large uplift of 3.70 percentage points. By extending the test to 28 days, the experiment can detect a smaller and more realistic uplift of 2.60 percentage points, while still keeping the test within a practical business timeline. This design also captures four full weekly cycles, reducing the risk that the result is distorted by weekday and weekend behavioral differences.
+
+At the selected 28-day duration, the expected treatment rate is 34.96\%, calculated from the baseline Add-to-Cart rate of 32.36\% plus the testable uplift of 2.60 percentage points. This uplift is meaningful from both a statistical and business perspective. It is not so small that it would require an unrealistic sample size, but it is also not so large that the experiment depends on an overly optimistic behavioral assumption. Therefore, the 28-day design provides a balanced compromise between statistical sensitivity, operational feasibility, and business realism.
+
+\begin{table}[H]
+\centering
+\caption{Testable Uplift by Experiment Duration}
+\label{tab:testable_mde_duration}
+
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+
+\begin{tabular*}{\columnwidth}{|@{\hspace{4pt}\extracolsep{\fill}}lrr@{\hspace{4pt}}|}
+\toprule
+\textbf{Duration} & \textbf{Min. Uplift} & \textbf{Sample/Group} \\
+\midrule
+14 days & 3.70 pp & 2,688 \\
+28 days & 2.60 pp & 5,375 \\
+42 days & 2.10 pp & 8,063 \\
+56 days & 1.90 pp & 10,751 \\
+84 days & 1.50 pp & 16,126 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+The financial evaluation further supports the decision to run the experiment. Under the testable uplift of 2.60 percentage points, all 42 evaluated combinations of project cost and gross margin remain profitable. The minimum expected incremental profit is \$5,198.49, while the maximum reaches \$91,090.97. The corresponding ROMI ranges from 0.52 to 910.91, indicating that the proposed funnel intervention is financially attractive across a wide range of business assumptions.
+
+\begin{table}[H]
+\centering
+\caption{Expected Incremental Profit at 2.60 pp Uplift}
+\label{tab:funnel_incremental_profit_mde}
+
+\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{2.5pt}
+\scriptsize
+
+\begin{tabular*}{\columnwidth}{|@{\hspace{4pt}\extracolsep{\fill}}lrrrrrr@{\hspace{4pt}}|}
+\toprule
+\textbf{Cost} & \textbf{GM10} & \textbf{GM20} & \textbf{GM30} & \textbf{GM40} & \textbf{GM50} & \textbf{GM60} \\
+\midrule
+\$100 & 15.1 & 30.3 & 45.5 & 60.7 & 75.9 & 91.1 \\
+\$250 & 14.9 & 30.1 & 45.3 & 60.5 & 75.7 & 90.9 \\
+\$500 & 14.7 & 29.9 & 45.1 & 60.3 & 75.5 & 90.7 \\
+\$1k & 14.2 & 29.4 & 44.6 & 59.8 & 75.0 & 90.2 \\
+\$2.5k & 12.7 & 27.9 & 43.1 & 58.3 & 73.5 & 88.7 \\
+\$5k & 10.2 & 25.4 & 40.6 & 55.8 & 71.0 & 86.2 \\
+\$10k & 5.2 & 20.4 & 35.6 & 50.8 & 66.0 & 81.2 \\
+\bottomrule
+\end{tabular*}
+\vspace{1pt}
+
+\scriptsize{\textit{Note:} Profit values are reported in USD thousands.}
+\end{table}
+
+For the final campaign recommendation, the most practical design is to run a 28-day A/B test with a target uplift of 2.60 percentage points in the Product View to Add-to-Cart rate. Under a representative project cost of \$500 and gross margin of 30\%, the campaign is expected to generate approximately \$45,095.48 in incremental profit if the treatment reaches the target uplift. This makes the campaign worth testing before full-scale deployment, because the experiment is both statistically measurable and financially meaningful.
+
+The risk scenario also supports the robustness of the proposed design. Even when the downstream Add-to-Cart to Purchase rate declines, the campaign remains profitable under the evaluated assumptions. For example, with a project cost of \$500 and a gross margin of 30\%, even a small uplift of 0.25 percentage points remains profitable when the Add-to-Cart to Purchase rate declines by 50\%. This means the campaign does not rely entirely on a perfect downstream conversion environment. However, the final rollout decision should still monitor checkout success and purchase conversion as guardrail metrics, because a higher Add-to-Cart rate is only valuable if it does not reduce the quality of downstream purchasing behavior.
+
+Overall, the final A/B testing design is suitable for implementation. The experiment targets a clear funnel problem, uses a directly aligned primary metric, has enough eligible traffic for a statistically valid test, and demonstrates strong expected financial value. The recommended decision is therefore to launch the optimized product-page treatment as a controlled 28-day A/B test. If the treatment achieves at least a 2.60 percentage-point uplift in Add-to-Cart rate without harming downstream purchase behavior, the campaign should be scaled to the full product-view audience.
+
+
+\subsubsection{Segment-Level Campaign Optimization}
+
+After the funnel campaign identifies which website experience should be improved, the segment-level campaign optimization determines where marketing budget should be allocated across historical customer segments. The purpose is not only to identify behaviorally attractive groups, but also to test whether each group can generate positive expected profit after accounting for average order value (AOV), gross margin (GM), customer acquisition cost (CAC), assumed conversion rate (CR), break-even CR, and ROMI. Since the revenue field is detected in micro format, all revenue values are first converted into standard currency units. The resulting buyer benchmark AOV is \$114.44, which serves as the reference point for assigning expected AOV assumptions across both buyer and non-buyer segments.
+
+The economic logic is based on a simple unit-profit rule. Expected campaign profit increases when the expected gross contribution, measured by $N \times CR \times AOV \times GM$, is larger than the campaign acquisition cost, measured by $N \times CAC$. ROMI is then used as the scaling criterion, while the break-even CR shows the minimum conversion rate required for a segment to avoid negative profit under a given CAC and margin scenario.
+
+Table~\ref{tab:segment_optimization_output} summarizes the final optimization output. The result is highly selective. Only \textit{High-Value Engaged Buyers} is recommended to \textit{Scale Aggressively}. This segment contains 5,020 customers, has the highest expected AOV at \$179.34, an assumed conversion rate of 24\%, and a positive ROMI of 1.26. Its simulated expected profit is \$54,161.28. All other segments are classified as \textit{Do Not Scale} because their assumed conversion rates are below the break-even requirement or because their expected contribution does not cover CAC after margin assumptions are applied.
+
+\begin{table}[H]
+\centering
+\caption{Segment-Level Campaign Optimization Output}
+\label{tab:segment_optimization_output}
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular*}{\columnwidth}{| @{\extracolsep{\fill}}lrrrrr@{} |}
+\toprule
+\textbf{Segment} & \textbf{N} & \textbf{AOV} & \textbf{CR} & \textbf{ROMI} & \textbf{Profit} \\
+\midrule
+High-Value Engaged Buyers & 5{,}020 & 179.34 & 0.24 & 1.26 & 54{,}161 \\
+At-Risk Low-Activity Buyers & 5{,}325 & 84.48 & 0.01 & -0.99 & -155{,}175 \\
+Recent Quality Buyers & 3{,}958 & 79.51 & 0.18 & -0.48 & -20{,}772 \\
+New Low-Intent Visitors & 78{,}383 & 62.94 & 0.01 & -0.99 & -1{,}911{,}963 \\
+Dormant Engaged Non-Buyers & 460{,}604 & 85.83 & 0.03 & -0.85 & -2{,}275{,}116 \\
+General Non-Buyers & 574{,}771 & 62.94 & 0.01 & -0.99 & -9{,}881{,}345 \\
+Hot Prospects & 61{,}217 & 108.72 & 0.07 & -0.65 & -343{,}666 \\
+Warm Prospects & 83{,}670 & 91.55 & 0.04 & -0.89 & -834{,}971 \\
+\bottomrule
+\end{tabular*}
+\vspace{1pt}
+
+\scriptsize{\textit{Note:} Profit is simulated expected profit in USD; CR is reported as a decimal rate.}
+\end{table}
+
+The break-even pivot analysis explains why most segments should not be scaled immediately. As shown in Table~\ref{tab:segment_breakeven_examples}, \textit{High-Value Engaged Buyers} require only a 13.94\% conversion rate under a 40\% margin and \$10 CAC scenario, which is below their assumed CR of 24\%. By contrast, \textit{Hot Prospects} require 22.99\%, \textit{Warm Prospects} require 27.31\%, and \textit{General Non-Buyers} require 39.72\% under the same scenario. These thresholds are much higher than their assumed conversion rates, indicating that broad paid activation would likely destroy value rather than create it.
+
+\begin{table}[H]
+\centering
+\caption{Selected Break-Even Conversion Rates by Segment}
+\label{tab:segment_breakeven_examples}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+\begin{tabular*}{\columnwidth}{|@{\hspace{4pt}\extracolsep{\fill}}lrrrr@{\hspace{4pt}}|}
+\toprule
+\textbf{Segment} & \textbf{GM40, \$5} & \textbf{GM40, \$10} & \textbf{GM50, \$5} & \textbf{GM50, \$10} \\
+\midrule
+High-Value Engaged Buyers & 6.97\% & 13.94\% & 5.58\% & 11.15\% \\
+Recent Quality Buyers & 15.72\% & 31.44\% & 12.58\% & 25.15\% \\
+Dormant Engaged Non-Buyers & 14.56\% & 29.13\% & 11.65\% & 23.30\% \\
+Hot Prospects & 11.50\% & 22.99\% & 9.20\% & 18.40\% \\
+Warm Prospects & 13.65\% & 27.31\% & 10.92\% & 21.84\% \\
+General Non-Buyers & 19.86\% & 39.72\% & 15.89\% & 31.77\% \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+The practical strategy should therefore be tiered. First, \textit{High-Value Engaged Buyers} should receive the primary performance-marketing budget through loyalty offers, early access campaigns, premium remarketing, personalized bundles, and cross-sell or upsell recommendations. Since the segment already has strong purchase probability and high AOV, the campaign should prioritize retention and value expansion rather than heavy discounts. Margin-protective incentives such as free shipping thresholds, bundle savings, or member-only access are more appropriate than broad price cuts.
+
+Second, \textit{Recent Quality Buyers} should not be scaled with expensive paid media despite their 18\% assumed CR, because their ROMI remains negative. A more realistic strategy is low-cost lifecycle automation, including post-purchase email sequences, second-purchase reminders, product replenishment prompts, and complementary product recommendations. The goal is to raise repeat purchase probability without materially increasing CAC.
+
+Third, \textit{Hot Prospects}, \textit{Warm Prospects}, and \textit{Dormant Engaged Non-Buyers} should be treated as testing and nurturing audiences rather than immediate scale audiences. \textit{Hot Prospects} are the best first experiment because they require the smallest sample and shortest estimated duration. If the experiment achieves statistical significance but incremental profit is still negative, the campaign should not be scaled; instead, the result should be used to refine offers, reduce CAC, or identify stronger subsegments.
+
+Finally, \textit{General Non-Buyers} and \textit{New Low-Intent Visitors} should be excluded from costly retargeting or direct-response campaigns. These groups are large, but their assumed conversion rates are extremely low and their simulated losses are the largest. Marketing actions for these users should focus on low-cost acquisition-quality improvement, landing-page relevance, organic content, and broad brand education. Overall, the segment-level strategy is to scale only where unit economics are already positive, test where behavioral potential exists but profitability is uncertain, and suppress audiences where conversion economics are structurally weak.
+
+Although the profitability simulation recommends immediate scaling only for High-Value Engaged Buyers, the A/B testing design output can still support controlled learning for selected non-buyer segments. The experimental plan focuses on Dormant Engaged Non-Buyers, Hot Prospects, and Warm Prospects because these groups contain observable behavioral intent signals. The baseline conversion rates are 3\%, 7\%, and 4\%, respectively, with expected uplift assumptions of 6\%, 15\%, and 10\%.
+
+Table~\ref{tab:segment_ab_design} summarizes the required experiment scale. Hot Prospects are the most feasible test audience, requiring 9,896 users per group and an estimated 10-day duration. Dormant Engaged Non-Buyers require 144,902 users per group but remain feasible due to their very large segment size, with an estimated 19-day duration. Warm Prospects require 39,433 users per group and approximately 29 days, making the test operationally longer but still possible.
+
+\begin{table}[H]
+\centering
+\caption{A/B Testing Design for Selected Non-Buyer Segments}
+\label{tab:segment_ab_design}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+\begin{tabular*}{\columnwidth}{|@{\hspace{4pt}\extracolsep{\fill}}lrrrr@{\hspace{4pt}}|}
+\toprule
+\textbf{Segment} & \textbf{Base CR} & \textbf{Uplift} & \textbf{n/group} & \textbf{Days} \\
+\midrule
+Dormant Engaged Non-Buyers & 0.03 & 6\% & 144{,}902 & 19 \\
+Hot Prospects & 0.07 & 15\% & 9{,}896 & 10 \\
+Warm Prospects & 0.04 & 10\% & 39{,}433 & 29 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+However, these experiments should be interpreted as validation tests rather than immediate scale decisions. Because all three non-buyer segments have negative simulated ROMI under the current assumptions, a positive statistical uplift alone is insufficient. The success criterion should require both statistical significance and positive incremental profit. If a treatment improves conversion but remains below the break-even threshold, the business should not scale it. Instead, the test result should be used to refine targeting, reduce CAC, improve offer design, or identify subsegments with stronger economics.
+
+The final strategic recommendation is therefore conservative and financially disciplined. Scale High-Value Engaged Buyers immediately with margin-protective retention and upsell campaigns. Use Recent Quality Buyers and Dormant Engaged Non-Buyers for low-cost lifecycle automation. Test Hot and Warm Prospects selectively to learn whether conversion probability can be improved enough to overcome CAC. Suppress General Non-Buyers and New Low-Intent Visitors from expensive paid campaigns. This strategy aligns marketing investment with expected profitability rather than traffic volume or engagement signals alone, and provides the economic baseline for the following CLV-based campaign analysis.
+
+
+\subsubsection{CLV-Based Segment Campaign}
+
+The proposed campaign framework evaluates the economic
+feasibility of targeting predictive CLV segments under
+varying operational conditions. Specifically, campaign
+profitability is examined across combinations of Customer
+Acquisition Cost (CAC), Conversion Rate (CR), and Gross
+Margin (GM) assumptions for the Stars segment.
+
+Table~\ref{tab:sensitivity_stars} summarizes representative
+profitability scenarios for the Stars segment. Among the
+64 configurations evaluated, profitable outcomes are
+primarily concentrated in low-CAC and high-margin settings.
+In contrast, the Low Priority segment yields no profitable
+configuration under the tested assumptions, as the required
+break-even conversion thresholds consistently exceed
+realistic campaign benchmarks.
+
+\begin{table}[H]
+\centering
+\caption{Selected Sensitivity Scenarios --- Stars Segment}
+\label{tab:sensitivity_stars}
+
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\footnotesize
+
+\begin{tabular}{| c c c c c c |}
+\toprule
+
+\textbf{CAC} & \textbf{CR} & \textbf{GM}
+& \textbf{Profit} & \textbf{ROI}
+& \textbf{BE-CR} \\
+
+\textbf{(\$)} & \textbf{(\%)} & \textbf{(\%)}
+& \textbf{(\$)} & \textbf{(\%)}
+& \textbf{(\%)} \\
+
+\midrule
+
+0.01 & 20 & 50 & 571.80 & 2{,}322.5 & 0.83 \\
+0.01 & 20 & 40 & 452.54 & 1{,}838.4 & 1.03 \\
+0.01 & 10 & 50 & 274.31 & 1{,}114.1 & 0.83 \\
+0.05 & 20 & 50 & 474.31 & 385.5 & 4.13 \\
+0.05 & 10 & 50 & 177.12 & 144.0 & 4.13 \\
+0.05 & 20 & 20 & 35.02 & 28.5 & 2.06 \\
+0.20 & 20 & 50 & 351.80 & 71.4 & 16.51 \\
+
+\midrule
+
+\multicolumn{6}{|l|}{\textit{Low Priority: no profitable 
+scenario under any configuration}} \\
+
+\bottomrule
+\end{tabular}
+
+\end{table}
+
+\noindent\textit{Note: CR = Conversion Rate; GM = Gross 
+Margin; BE-CR = Break-even Conversion Rate.}
+
+\vspace{0.5em}
+
+The break-even conversion threshold for the Stars segment
+ranges from 0.83\% under highly favorable cost conditions
+(CAC = \$0.01, GM = 50\%) to 41.3\% under high-acquisition-cost
+and low-margin conditions (CAC = \$0.20, GM = 20\%). The
+results demonstrate substantial sensitivity to acquisition
+cost, with profitability narrowing considerably as CAC
+increases.
+
+At the lowest CAC level (\$0.01), the campaign remains
+profitable across all tested conversion-rate and margin
+combinations. However, as acquisition cost increases to
+\$0.05 and beyond, profitability becomes increasingly
+dependent on either elevated conversion performance or
+higher gross-margin assumptions.
+
+To evaluate whether these economically viable scenarios are
+also operationally testable, the framework further examines
+their A/B testing feasibility. A baseline conversion rate
+of 5\% is assumed as an industry benchmark reference point
+for MDE estimation, while testing duration is rounded to
+the nearest multiple of 7 days to account for weekly
+behavioral cycles and reduce day-of-week bias.
+
+Table~\ref{tab:ab_feasibility} summarizes the resulting
+feasibility classification across campaign configurations.
+
+\begin{table}[H]
+\centering
+\caption{A/B Test Feasibility --- Stars Segment}
+\label{tab:ab_feasibility}
+
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{4pt}
+\footnotesize
+
+\begin{tabular}{| c c c c c c |}
+\toprule
+
+\textbf{CAC} & \textbf{GM} & \textbf{Baseline} & \textbf{BE-CR}
+& \textbf{n/group} & \textbf{Days} \\
+
+\textbf{(\$)} & \textbf{(\%)} & \textbf{CR (\%)}
+& \textbf{(\%)} & & \\
+
+\midrule
+
+\multicolumn{6}{|l|}{\textit{Profitable at baseline -- 
+deploy immediately}} \\
+
+0.01 & 20 & 5 & 2.06 & --- & --- \\
+0.01 & 30 & 5 & 1.38 & --- & --- \\
+0.01 & 40 & 5 & 1.03 & --- & --- \\
+0.01 & 50 & 5 & 0.83 & --- & --- \\
+0.05 & 50 & 5 & 4.13 & --- & --- \\
+
+\midrule
+
+\multicolumn{6}{|l|}{\textit{Feasible --- A/B test 
+recommended}} \\
+
+0.05 & 20 & 5 & 10.32 & 388 & 14 \\
+0.20 & 50 & 5 & 16.51 & 110 & 7 \\
+
+\midrule
+
+\multicolumn{6}{|l|}{\textit{Insufficient sample}} \\
+
+0.05 & 30 & 5 & 6.88 & 2{,}475 & 56 \\
+0.05 & 40 & 5 & 5.16 & --- & --- \\
+
+\midrule
+
+\multicolumn{6}{|l|}{\textit{Unrealistic / Infeasible}} \\
+
+0.20 & 20 & 5 & 41.28 & --- & --- \\
+0.50 & 20 & 5 & 103.20 & --- & --- \\
+
+\bottomrule
+\end{tabular}
+
+\end{table}
+
+\noindent\textit{Note: BE-CR = Break-even Conversion Rate.
+Scenarios with BE-CR $>$ 20\% are classified as Unrealistic
+based on common campaign performance benchmarks, while
+BE-CR $\geq$ 100\% is considered Infeasible. Scenarios
+where the required sample size exceeds the available Stars
+population (2,462 users) are classified as Insufficient
+sample.}
+
+\vspace{0.5em}
+
+Two campaign configurations are identified as operationally
+feasible for A/B testing. The most practically deployable
+scenario occurs at CAC = \$0.05 with GM = 20\%, requiring
+388 users per group over a 14-day testing window --- well
+within the available Stars population. A second feasible
+configuration emerges under the high-margin setting
+(CAC = \$0.20, GM = 50\%), requiring a smaller experimental
+sample and shorter testing duration, though profitability
+remains highly sensitive to acquisition cost assumptions.
+
+Scenarios categorized as \textit{Profitable at Baseline}
+exhibit break-even conversion thresholds below the assumed
+baseline of 5\%, and may therefore be deployed directly
+without requiring incremental uplift from experimental
+treatment. Conversely, all configurations for the Low
+Priority segment are classified as either
+\textit{Unrealistic} or \textit{Infeasible}, confirming
+that conversion-focused campaigns targeting this segment
+cannot be economically justified under the tested
+assumptions.
+\begin{table}[H]
+\centering
+\caption{Final A/B Testing Design for Predictive CLV Campaign (Stars Segment)}
+\label{tab:clv_ab_final_design}
+
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+
+\begin{tabular}{|p{3.5cm}|p{3.8cm}|}
+\toprule
+
+\textbf{Design Component} & \textbf{Final Decision} \\
+
+\midrule
+
+Target segment & Stars (High-Value Predicted Users) \\
+
+Eligible population & 2,462 identified users \\
+
+Randomization unit & User-level (\textit{fullVisitorId}) \\
+
+Traffic allocation & 50\% Control / 50\% Treatment \\
+
+Control group & Standard experience (no intervention) \\
+
+Treatment group & Personalized incentive campaign \\
+
+Primary metric & Conversion Rate (CR) \\
+
+Baseline CR & 5.00\% (Industry benchmark assumption) \\
+
+Minimum Detectable Effect (MDE)
+& +5.32 percentage points \\
+
+Required sample per group & 388 users \\
+
+Minimum testing duration & 14 days \\
+
+Statistical power & 80\% \\
+
+Significance level & 5\% \\
+
+\bottomrule
+\end{tabular}
+
+\end{table}
+\subsection{Final Comparison Segmentation}
+
+The final comparison segmentation links the historical customer segmentation results with the predictive CLV-based segmentation. The purpose of this step is to evaluate whether customers who were historically classified as valuable or high-potential are also identified by the predictive model as future high-value customers. In other words, this comparison connects past behavioral evidence with forward-looking customer value prediction.
+
+The historical segmentation dataset contains 1,272,948 users, while the prediction dataset contains 119,207 users. After merging the two datasets by \textit{fullVisitorId}, only 1,751 users appear in both datasets. This overlap group is important because it allows a direct comparison between historical segment labels and predictive segment labels for the same customers. Therefore, the analysis does not compare the two full datasets directly, but focuses on the matched users for whom both historical and predictive information are available.
+
+\begin{table}[H]
+\centering
+\caption{Historical Segments by Predictive CLV Segment}
+\label{tab:hist_pred_segment_comparison}
+
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+
+\begin{tabular}{|l|r|r|r|}
+\toprule
+\textbf{Historical Segment} 
+& \textbf{Stars} 
+& \textbf{Low Priority} 
+& \textbf{Total} \\
+\midrule
+
+At-Risk Low-Activity Buyers & 0 & 1 & 1 \\
+Dormant Engaged Non-Buyers & 7 & 235 & 242 \\
+General Non-Buyers & 0 & 132 & 132 \\
+High-Value Engaged Buyers & 22 & 103 & 125 \\
+Hot Prospects & 17 & 349 & 366 \\
+New Low-Intent Visitors & 0 & 150 & 150 \\
+Recent Quality Buyers & 2 & 32 & 34 \\
+Warm Prospects & 31 & 670 & 701 \\
+
+\midrule
+\textbf{Total} & \textbf{79} & \textbf{1,672} & \textbf{1,751} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The predictive model classifies only 79 out of the 1,751 matched customers as \textit{Stars}, equivalent to 4.51\% of the overlap sample. The remaining 1,672 users, or 95.49\%, are assigned to the \textit{Low Priority} group. This result confirms that the predicted high-value segment is highly selective. Rather than broadly labeling many customers as valuable, the model identifies a relatively small group with stronger future commercial potential. This is consistent with the CLV analysis, where the Stars segment represents a small but strategically important customer group.
+
+A key finding is that all 79 predicted Stars come from historically meaningful or high-potential groups. Specifically, the Stars segment is composed of 31 Warm Prospects, 22 High-Value Engaged Buyers, 17 Hot Prospects, 7 Dormant Engaged Non-Buyers, and 2 Recent Quality Buyers. No predicted Stars come from General Non-Buyers, New Low-Intent Visitors, or At-Risk Low-Activity Buyers. This pattern suggests that the predictive model is behaviorally reasonable: it does not randomly assign future value to historically weak or low-intent users, but instead concentrates predicted value among users who previously showed either purchase value or strong engagement signals.
+
+Among the historical groups, Warm Prospects contribute the largest number of predicted Stars, with 31 customers. This is strategically important because Warm Prospects were previously interpreted as interested non-buyers who had not yet converted. Their presence in the Stars segment suggests that some non-buyers may have substantial future value even if they have not generated revenue historically. Therefore, the company should not rely only on past purchase behavior when deciding campaign priorities. Users with strong engagement signals may also deserve targeted nurturing because they can become high-value customers in the future.
+
+Overall, the final comparison segmentation provides a practical bridge between descriptive segmentation and predictive customer value modeling. Historical segmentation explains where customers came from and how they behaved in the past, while predictive segmentation estimates which customers are most likely to generate future value. The most important action group is therefore the intersection between historically valuable or high-potential customers and predicted Stars. In this analysis, that group contains 79 customers, representing 100\% of all predicted Stars but only 5.38\% of the historically good segments. This means that many customers may look promising based on historical behavior, but only a small subset is strong enough to justify priority investment under the predictive CLV framework.
+
+From a strategic perspective, the company should use this comparison to move from broad segment-based marketing to precision targeting. High-Value Engaged Buyers and Hot Prospects should receive priority conversion and retention actions because they are supported by both historical behavior and predictive value. Warm Prospects should be treated as an important growth segment because they represent the largest source of predicted Stars. Dormant Engaged Non-Buyers and Recent Quality Buyers should be handled selectively, focusing only on those with high predicted value. Finally, General Non-Buyers, New Low-Intent Visitors, and most Low Priority users should be managed through low-cost nurturing or acquisition-quality improvement rather than expensive personalized campaigns.
+
+
+
+\section{Conclusion}
+
+This study proposed an end-to-end data-driven marketing
+framework using the Google Merchandise Store dataset,
+integrating behavioral preprocessing, customer segmentation,
+predictive revenue modeling, and campaign strategy into a
+unified analytical pipeline.
+
+The preprocessing stage transformed raw clickstream logs
+into structured behavioral features capturing RFM signals,
+funnel progression, engagement quality, and temporal
+patterns. Exploratory analysis highlighted several important
+characteristics of the dataset, including severe transaction
+imbalance, strong revenue concentration among a small subset
+of customers, and weak long-term retention behavior.
+
+Historical segmentation successfully identified distinct
+buyer and non-buyer behavioral cohorts, enabling the
+development of differentiated marketing strategies for
+retention, reactivation, nurturing, and conversion
+optimization. The predictive modeling stage further extended
+this framework through a two-stage XGBoost hurdle
+architecture designed to address the highly zero-inflated
+revenue distribution. The resulting predictive scores were
+used to construct actionable customer segments for targeted
+campaign allocation.
+
+Building upon these analytical outputs, the strategy
+framework combined funnel optimization, predictive targeting,
+and experimental validation into a unified decision-making
+approach. Funnel interventions focused on reducing
+View-to-Add-to-Cart friction, while predictive campaign
+allocation concentrated marketing resources on
+high-propensity users identified by the CLV model.
+Sensitivity analysis and A/B testing design were further
+incorporated to evaluate both statistical feasibility and
+economic viability prior to deployment.
+
+Several limitations should be acknowledged. The analysis is
+restricted to a single retailer dataset and historical time
+window, potentially limiting generalizability across broader
+e-commerce contexts. In addition, the extremely imbalanced
+purchase distribution constrains the amount of positive
+training data available for revenue prediction. Campaign
+evaluation also relies on assumed CAC and margin scenarios
+rather than live experimental observations.
+
+Future work may extend this framework through sequential or
+deep learning architectures capable of capturing richer
+temporal browsing dynamics. Additional opportunities include
+the deployment of live experimentation infrastructure for
+real-time causal validation, as well as dynamic cohort
+tracking systems that continuously update customer value
+states over time.
+%--------------------------------------------------
+\onecolumn
+\appendices
+
+\appendices 
+
+\section{K-Means Feature Selection and Scoring Definitions}
+\label{app:kmeans_features}
+
+\begin{table}[H]
+\centering
+\caption{K-Means Feature Selection and Scoring Definitions}
+\label{tab:kmeans_features}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\setlength{\tabcolsep}{4pt}
+
+\begin{tabularx}{\textwidth}{@{} l l X X l @{}}
+\toprule
+\textbf{Group} 
+& \textbf{Feature} 
+& \textbf{Definition} 
+& \textbf{Calculation Method} 
+& \textbf{Direction} \\ 
+\midrule
+
+\multirow{8}{*}{Buyer} 
+& R\_score 
+& Recency, measured as days since the last purchase. 
+& $R =$ days between the feature end date and the last purchase date. 
+& Lower Better \\
+
+& F\_score 
+& Session frequency, measured by the number of sessions. 
+& $F =$ total session count, represented by \textit{visitId\_count}. 
+& Higher Better \\
+
+& M\_score 
+& Monetary value, measured by the total amount spent. 
+& $M =$ total transaction revenue, represented by \textit{transactionRevenue\_sum}. 
+& Higher Better \\
+
+& L\_score 
+& Loyalty or lifetime of the customer. 
+& $L =$ last visit date minus first visit date, measured in days. 
+& Higher Better \\
+
+& E\_score 
+& Engagement score based on browsing intensity and time on site. 
+& $E = \log(1+E_{\textit{pageviews}}) + \log(1+E_{\textit{hits}}) + \log(1+E_{\textit{timeOnSite}})$, where each component is calculated as the user-level mean. 
+& Higher Better \\
+
+& Bounce\_score 
+& Bounce rate. 
+& $Bounce =$ mean of \textit{totals\_bounces}. 
+& Lower Better \\
+
+& SessionQualityMean\_score 
+& Average session quality. 
+& $SessionQualityMean =$ mean of \textit{totals\_sessionQualityDim}. 
+& Higher Better \\
+
+& Funnel\_score 
+& Funnel depth, interpreted as engagement depth. 
+& $Funnel =$ mean of \textit{totals\_hits}. 
+& Higher Better \\
+
+\midrule
+
+\multirow{6}{*}{Non-Buyer} 
+& R\_score 
+& Recency, measured as days since the last visit. 
+& $R =$ days between the feature end date and the last visit date. 
+& Lower Better \\
+
+& E\_score 
+& Engagement score based on browsing intensity and time on site. 
+& $E = \log(1+E_{\textit{pageviews}}) + \log(1+E_{\textit{hits}}) + \log(1+E_{\textit{timeOnSite}})$, where each component is calculated as the user-level mean. 
+& Higher Better \\
+
+& Bounce\_score 
+& Bounce rate. 
+& $Bounce =$ mean of \textit{totals\_bounces}. 
+& Lower Better \\
+
+& SessionQualityMean\_score 
+& Average session quality. 
+& $SessionQualityMean =$ mean of \textit{totals\_sessionQualityDim}. 
+& Higher Better \\
+
+& Funnel\_score 
+& Funnel depth, interpreted as engagement depth. 
+& $Funnel =$ mean of \textit{totals\_hits}. 
+& Higher Better \\
+
+& Hibernation\_score 
+& Hibernation or inactivity level. 
+& $Hibernation = I(\textit{recency\_days} > T)$, where $T$ is the hibernation threshold. For repeat users, $T = \mu_{IVT} + 2\sigma_{IVT}$ with $IVT = \frac{\textit{lifetime\_days}}{\textit{visit\_count}-1}$. For non-repeat users, $T$ is the 90th percentile of \textit{recency\_days}. 
+& Lower Better \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent\textit{Note: The final K-Means clustering uses 8 score features for the buyer group and 6 score features for the non-buyer group. All selected variables are transformed into 1--5 score features before clustering. A score of 5 represents stronger customer quality or more desirable behavior, while a score of 1 represents weaker customer quality or less desirable behavior. For lower-better variables such as recency, bounce rate, and hibernation, the scoring direction is reversed so that better behavior still receives a higher score.}
 
 \end{document}
